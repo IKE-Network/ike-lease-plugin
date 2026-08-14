@@ -12,7 +12,7 @@
     </parent>
 
     <artifactId>ike-lease-plugin</artifactId>
-    <version>3-SNAPSHOT</version>
+    <version>3</version>
     <packaging>jar</packaging>
 
     <name>IKE Working-Set Leases — IntelliJ Plugin</name>
