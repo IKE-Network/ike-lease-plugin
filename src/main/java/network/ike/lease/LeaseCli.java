@@ -24,6 +24,14 @@ public final class LeaseCli {
     /** Seconds to wait for the lease script before giving up. */
     private static final long TIMEOUT_SECONDS = 10L;
 
+    /**
+     * Seconds to wait for a confirming call, which deliberately sleeps out
+     * the sync layer's propagation window before reading the record back.
+     * Generous against the script's own 25-second default: killing the
+     * confirmation early would report a race lost that was never run.
+     */
+    private static final long CONFIRM_TIMEOUT_SECONDS = 120L;
+
     private final Path ikeDev;
 
     /**
@@ -93,6 +101,30 @@ public final class LeaseCli {
     }
 
     /**
+     * Takes the lease as {@link #ensure} does, then reads the record back
+     * after the sync layer has had time to deliver a competing claim.
+     *
+     * <p>Measured 2026-08-12: two machines acquiring the same <em>free</em>
+     * lease inside the propagation window both succeed, the sync layer
+     * settles it last-writer-wins with no conflict copy, and the loser is
+     * never told. The epoch cannot catch this — both machines mint the same
+     * epoch from the same starting record — so the read-back is the only
+     * thing that makes an acquisition trustworthy.
+     *
+     * <p>This blocks for the settle window, roughly 25 seconds. Call it
+     * only for consequential steps, and never on the event dispatch thread.
+     *
+     * @param workingSet the working-set directory name
+     * @return {@code true} when this machine still holds the lease after the
+     *         read-back; {@code false} when another machine holds it or won
+     *         the race
+     */
+    public boolean ensureConfirmed(String workingSet) {
+        return run(CONFIRM_TIMEOUT_SECONDS, "ensure", workingSet, "--confirm")
+                .exitCode() == 0;
+    }
+
+    /**
      * Takes the lease from whoever holds it, advancing the fencing epoch.
      *
      * @param workingSet the working-set directory name
@@ -151,6 +183,10 @@ public final class LeaseCli {
     }
 
     private Result run(String... args) {
+        return run(TIMEOUT_SECONDS, args);
+    }
+
+    private Result run(long timeoutSeconds, String... args) {
         List<String> command = new ArrayList<>();
         command.add(script().toString());
         command.addAll(List.of(args));
@@ -166,7 +202,7 @@ public final class LeaseCli {
                     output.append(line).append('\n');
                 }
             }
-            if (!process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            if (!process.waitFor(timeoutSeconds, TimeUnit.SECONDS)) {
                 process.destroyForcibly();
                 return new Result(-1, output.toString());
             }
