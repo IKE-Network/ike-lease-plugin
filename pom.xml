@@ -5,7 +5,12 @@
                              http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>network.ike</groupId>
+    <parent>
+        <groupId>network.ike</groupId>
+        <artifactId>ike-base-parent</artifactId>
+        <version>15</version>
+    </parent>
+
     <artifactId>ike-lease-plugin</artifactId>
     <version>2-SNAPSHOT</version>
     <packaging>jar</packaging>
@@ -18,76 +23,91 @@
     </description>
 
     <!--
-        Standalone by design: no ike-parent. This is not part of any
-        reactor and produces an IDE artifact rather than a published
-        library, so it does not need the IKE build apparatus.
+        Distribution is the internal Nexus (ike-staging, inherited from
+        ike-base-parent), never Maven Central. The parent's JReleaser
+        configuration is bound to no lifecycle phase, so inheriting it
+        carries no obligation to publish anywhere public — and an IDE
+        plugin has no business on Central.
 
-        It compiles against jars from the locally installed IDE, placed in
-        the local repository by ./install-idea-sdk.sh. See that script for
-        why the JetBrains Maven artifacts are not used.
+        The IntelliJ platform artifacts come from JetBrains' own Maven
+        repository, declared below. An earlier reading of that repository
+        concluded it published too thin a slice to build against, because
+        only `core` was examined; the classes missing from `core` are in
+        `util`, `project-model`, `ide` and `ide-core`. Every type this
+        plugin touches is available, which is what retired
+        install-idea-sdk.sh and its locally-installed-IDE jars — those
+        could never be resolved by a machine without IntelliJ on it,
+        which is every CI agent.
     -->
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>21</maven.compiler.release>
         <idea.build>262.9437.185</idea.build>
-        <idea.groupId>com.jetbrains.intellij.local</idea.groupId>
+        <idea.groupId>com.jetbrains.intellij.platform</idea.groupId>
     </properties>
 
+    <repositories>
+        <!-- The platform artifacts themselves. -->
+        <repository>
+            <id>intellij-repository-releases</id>
+            <url>https://www.jetbrains.com/intellij-repository/releases</url>
+            <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+        <!-- Their transitive dependencies (intellij-deps-fastutil and
+             friends) live in a separate repository; without this one the
+             resolver 404s on them rather than on the platform jars, which
+             makes the failure look like the wrong thing. -->
+        <repository>
+            <id>intellij-dependencies</id>
+            <url>https://cache-redirector.jetbrains.com/intellij-dependencies</url>
+            <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+    </repositories>
+
     <dependencies>
-        <!-- Project, ApplicationManager, Service, FileDocumentManager, StartupActivity -->
+        <!-- Project, ApplicationManager, Service, FileDocumentManager,
+             ProgressManager, Task, ProgressIndicator -->
         <dependency>
             <groupId>${idea.groupId}</groupId>
-            <artifactId>intellij.platform.core</artifactId>
+            <artifactId>core</artifactId>
             <version>${idea.build}</version>
             <scope>provided</scope>
         </dependency>
-        <!-- ProjectManager, ProjectManagerListener -->
-        <dependency>
-            <groupId>${idea.groupId}</groupId>
-            <artifactId>intellij.platform.projectModel</artifactId>
-            <version>${idea.build}</version>
-            <scope>provided</scope>
-        </dependency>
-        <!-- Messages -->
-        <dependency>
-            <groupId>${idea.groupId}</groupId>
-            <artifactId>intellij.platform.ide</artifactId>
-            <version>${idea.build}</version>
-            <scope>provided</scope>
-        </dependency>
-        <!-- NotificationGroupManager, NotificationType -->
-        <dependency>
-            <groupId>${idea.groupId}</groupId>
-            <artifactId>intellij.platform.ide.core</artifactId>
-            <version>${idea.build}</version>
-            <scope>provided</scope>
-        </dependency>
-        <!-- Disposable -->
-        <dependency>
-            <groupId>${idea.groupId}</groupId>
-            <artifactId>util-8</artifactId>
-            <version>${idea.build}</version>
-            <scope>provided</scope>
-        </dependency>
-        <!-- ComponentManager, AreaInstance — reached through the APIs above -->
+        <!-- Disposable, and the ComponentManager/AreaInstance types the
+             APIs above reach through -->
         <dependency>
             <groupId>${idea.groupId}</groupId>
             <artifactId>util</artifactId>
             <version>${idea.build}</version>
             <scope>provided</scope>
         </dependency>
-        <!-- Pair, referenced by Messages' signatures -->
+        <!-- ProjectManager, ProjectManagerListener -->
         <dependency>
             <groupId>${idea.groupId}</groupId>
-            <artifactId>util_rt</artifactId>
+            <artifactId>project-model</artifactId>
             <version>${idea.build}</version>
             <scope>provided</scope>
         </dependency>
-        <!-- org.jetbrains.annotations, on platform API signatures throughout -->
+        <!-- Messages -->
         <dependency>
             <groupId>${idea.groupId}</groupId>
-            <artifactId>annotations</artifactId>
+            <artifactId>ide</artifactId>
             <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- NotificationGroupManager, NotificationType -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>ide-core</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- org.jetbrains.annotations, on platform API signatures throughout.
+             The real thing from Central, not the copy the IDE ships. -->
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>26.0.2</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>

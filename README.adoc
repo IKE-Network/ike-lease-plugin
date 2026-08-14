@@ -44,35 +44,59 @@ keeps one build tool in the house.
 
 [source,bash]
 ----
-./install-idea-sdk.sh    # once per machine
 mvn package
 ----
 
-`target/ike-lease-plugin-1-SNAPSHOT.zip` installs through
-*Settings → Plugins → ⚙ → Install Plugin from Disk*, then restart the IDE.
+Nothing to install first: the build resolves the IntelliJ platform from
+JetBrains' own Maven repository. The result,
+`target/ike-lease-plugin-<version>.zip`, installs through
+*Settings → Plugins → ⚙ → Install Plugin from Disk*, or by unzipping into
+the IDE's `plugins/` directory. Either way, restart the IDE.
 
-=== Why the SDK is installed from the local IDE
+Releases are published to the internal Nexus (`ike-staging`, inherited
+from `ike-base-parent`) and attached to the GitHub release. Never to Maven
+Central: the parent's JReleaser configuration is bound to no lifecycle
+phase, so inheriting it carries no obligation to publish anywhere public,
+and an IDE plugin has no business on Central.
 
-`install-idea-sdk.sh` copies eight jars out of the installed IDE into the
-local Maven repository under the synthetic, never-published groupId
-`com.jetbrains.intellij.local`, versioned by the IDE's own build number
-(read from its `build.txt`, which is the only reliable source when
-several IDE versions are installed).
+=== Where the platform artifacts come from
 
-Two alternatives were tried and rejected:
+Five published artifacts, all from JetBrains' repository, all `provided`:
 
-* *JetBrains' Maven repository.* The artifacts resolve — with both
-  `intellij-repository/releases` and `intellij-dependencies` declared,
-  since the platform's own transitive dependencies live in the second —
-  but the published `platform:core` artifact is a far thinner slice than
-  the IDE's `intellij.platform.core.jar`: no `Project`, no `Disposable`,
-  no `StartupActivity`. The bucket serves no directory listing, so the
-  right combination of granular artifacts cannot be enumerated.
-* *`system`-scoped dependencies* pointing straight at the IDE. Maven 4
-  has retired that scope.
+[cols="1,3", options="header"]
+|===
+| Artifact | What this plugin takes from it
 
-Compiling against the installed IDE also guarantees the plugin is built
-against exactly the IDE it will run in.
+| `platform:core`
+| `Project`, `ApplicationManager`, `Service`, `FileDocumentManager`,
+  `ProgressManager`, `Task`, `ProgressIndicator`
+
+| `platform:util`         | `Disposable`
+| `platform:project-model`| `ProjectManager`, `ProjectManagerListener`
+| `platform:ide`          | `Messages`
+| `platform:ide-core`     | `NotificationGroupManager`, `NotificationType`
+|===
+
+Both `intellij-repository/releases` and `intellij-dependencies` are
+declared, because the platform's own transitive dependencies
+(`intellij-deps-fastutil` and friends) live in the second; without it the
+resolver fails on those rather than on the platform jars, which makes the
+failure look like the wrong problem.
+
+This replaced `install-idea-sdk.sh`, which copied eight jars out of the
+locally installed IDE under the synthetic groupId
+`com.jetbrains.intellij.local`. That script existed on the belief that
+JetBrains published too thin a slice to build against — `platform:core`
+has no `Disposable`, no `ProjectManager`, no `Messages`. The belief came
+from examining only `core`; those classes are published, in `util`,
+`project-model` and `ide`. The bucket serves no directory listing, which
+is why the right combination went unfound rather than being unavailable.
+
+The script also made the build unreproducible anywhere without IntelliJ
+installed — which is every CI agent — so it had to go regardless.
+
+`system`-scoped dependencies pointing straight at the IDE were the other
+rejected route; Maven 4 has retired that scope.
 
 == Status — working, takeover verified
 
