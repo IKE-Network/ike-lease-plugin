@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>network.ike</groupId>
+    <artifactId>ike-lease-plugin</artifactId>
+    <version>1-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>IKE Working-Set Leases — IntelliJ Plugin</name>
+    <description>
+        Enforces single-writer working-set leases across Syncthing-paired
+        machines. Opening a project acquires its lease; being fenced by a
+        takeover elsewhere saves open documents and closes the project.
+    </description>
+
+    <!--
+        Standalone by design: no ike-parent. This is not part of any
+        reactor and produces an IDE artifact rather than a published
+        library, so it does not need the IKE build apparatus.
+
+        It compiles against jars from the locally installed IDE, placed in
+        the local repository by ./install-idea-sdk.sh. See that script for
+        why the JetBrains Maven artifacts are not used.
+    -->
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>21</maven.compiler.release>
+        <idea.build>262.9437.185</idea.build>
+        <idea.groupId>com.jetbrains.intellij.local</idea.groupId>
+    </properties>
+
+    <dependencies>
+        <!-- Project, ApplicationManager, Service, FileDocumentManager, StartupActivity -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>intellij.platform.core</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- ProjectManager, ProjectManagerListener -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>intellij.platform.projectModel</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Messages -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>intellij.platform.ide</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- NotificationGroupManager, NotificationType -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>intellij.platform.ide.core</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Disposable -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>util-8</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- ComponentManager, AreaInstance — reached through the APIs above -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>util</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Pair, referenced by Messages' signatures -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>util_rt</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- org.jetbrains.annotations, on platform API signatures throughout -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>annotations</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <resources>
+            <!-- plugin.xml is filtered so its <version> tracks this POM. -->
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>META-INF/plugin.xml</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>META-INF/plugin.xml</exclude>
+                </excludes>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.7.1</version>
+                <configuration>
+                    <appendAssemblyId>false</appendAssemblyId>
+                    <descriptors>
+                        <descriptor>src/assembly/plugin-zip.xml</descriptor>
+                    </descriptors>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>plugin-zip</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -1,0 +1,27 @@
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0
+          http://maven.apache.org/xsd/assembly-2.2.0.xsd">
+    <!--
+        An IntelliJ plugin distribution is a zip containing one directory
+        named for the plugin, with its jars under lib/:
+
+            ike-lease-plugin/
+              lib/
+                ike-lease-plugin-1-SNAPSHOT.jar
+
+        Install through Settings > Plugins > Install Plugin from Disk.
+    -->
+    <id>plugin</id>
+    <formats>
+        <format>zip</format>
+    </formats>
+    <includeBaseDirectory>true</includeBaseDirectory>
+    <baseDirectory>${project.artifactId}</baseDirectory>
+    <files>
+        <file>
+            <source>${project.build.directory}/${project.artifactId}-${project.version}.jar</source>
+            <outputDirectory>lib</outputDirectory>
+        </file>
+    </files>
+</assembly>

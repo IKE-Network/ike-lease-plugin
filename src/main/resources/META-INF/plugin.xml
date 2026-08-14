@@ -1,0 +1,32 @@
+<idea-plugin>
+    <id>network.ike.lease</id>
+    <name>IKE Working-Set Leases</name>
+    <!-- Filtered from the Maven project version. Without it IntelliJ
+         shows the IDE build number as the plugin's version, which reads
+         as though the plugin were part of the platform. -->
+    <version>${project.version}</version>
+    <vendor email="kec@knowledge.design" url="https://ike.network">IKE Network</vendor>
+
+    <description><![CDATA[
+        Enforces single-writer working-set leases across Syncthing-paired
+        machines. Opening a project acquires its lease; a lease held live by
+        another machine raises a takeover dialog. When this machine is fenced
+        by a takeover elsewhere, open documents are saved and the project is
+        closed so the work reaches the machine taking over.
+        <br/><br/>
+        Design: <code>dev-working-set-lease</code> in ike-lab-documents;
+        implementation tracked in IKE-Network/ike-issues#1002.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <notificationGroup id="IKE Working-Set Leases"
+                           displayType="BALLOON"/>
+    </extensions>
+
+    <applicationListeners>
+        <listener class="network.ike.lease.LeaseProjectListener"
+                  topic="com.intellij.openapi.project.ProjectManagerListener"/>
+    </applicationListeners>
+</idea-plugin>

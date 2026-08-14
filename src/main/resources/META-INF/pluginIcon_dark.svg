@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+  <!--
+    Dark-theme variant of the IKE mark. Same geometry and the same
+    coral-to-orchid gradient pill as pluginIcon.svg; only the wordmark
+    changes, to white, which is what the official badge kit does for its
+    on-dark treatment.
+  -->
+  <defs>
+    <linearGradient id="ikeArcDark" x1="918.06" y1="103.86" x2="1363.88" y2="103.86"
+                    gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f4bfb9"/>
+      <stop offset="1" stop-color="#c98cec"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(2,11.615) scale(0.080749) translate(-918.06,0)">
+    <rect x="924.37" y="6.31" width="433.2" height="195.11" rx="97.56" ry="97.56"
+          fill="none" stroke="url(#ikeArcDark)" stroke-miterlimit="10" stroke-width="12.61"/>
+    <g fill="#ffffff">
+      <path d="M1020.77,51.58h20.79v104.56h-20.79V51.58Z"/>
+      <path d="M1063.24,51.58h20.75v46.13l53.51-46.13h31.81l-49.8,43.07,53.16,61.49h-27.49l-41.4-47.88-19.78,17.11v30.77h-20.75V51.58Z"/>
+      <path d="M1280.87,137.98v18.16h-96.26V51.58h94.8v18.16h-74.01v23.58h65.22v18.16h-65.22v26.51h75.47Z"/>
+    </g>
+  </g>
+</svg>
