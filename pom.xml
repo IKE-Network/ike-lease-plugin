@@ -46,6 +46,28 @@
         <idea.groupId>com.jetbrains.intellij.platform</idea.groupId>
         <network.ike.tooling__GA__ike-tooling__VERSION>245</network.ike.tooling__GA__ike-tooling__VERSION>
         <network.ike.tooling__GA__ike-tooling__ALIAS>ike-tooling.version</network.ike.tooling__GA__ike-tooling__ALIAS>
+
+        <!-- Release behaviour for the IKE release goals. These are read as
+             POM PROPERTIES, not as plugin <configuration> — the same names
+             set in a <configuration> block are silently reported unknown
+             and do nothing, which is exactly the sort of failure a release
+             should not discover by executing.
+
+             ike.publishToCentral OVERRIDES ike-base-parent, which sets it
+             to true. Inheriting the parent therefore opts a repository
+             into Maven Central publishing, and this one must never be
+             published there: an IDE plugin has no business on Central, and
+             its own dependencies are JetBrains platform artifacts that
+             nothing outside this build resolves. Nexus (ike-staging) is
+             the whole story. -->
+        <ike.publishToCentral>false</ike.publishToCentral>
+        <!-- No gh-pages site for this repository. The site is still BUILT
+             during the draft phase, which is where it earns its keep — it
+             is the javadoc gate. -->
+        <publishSite>false</publishSite>
+        <!-- Not registered in the cascade, so there is no entry on the IKE
+             Network landing page to refresh. -->
+        <ike.skip.orgSite>true</ike.skip.orgSite>
     </properties>
 
     <repositories>
@@ -143,28 +165,12 @@
                  The declaration exists to pin the version the `ike:`
                  prefix resolves to, so a release is reproducible rather
                  than dependent on whatever the local repository happens
-                 to hold.
-
-                 The three settings below are what makes a standalone,
-                 cascade-unregistered repository behave. publishToCentral
-                 is already false by default; it is stated because this
-                 artifact must never go to Central, and a default is a
-                 weaker guarantee than a declaration. -->
+                 to hold. Release behaviour is set in <properties> above,
+                 which is where these goals read it from. -->
             <plugin>
                 <groupId>network.ike.tooling</groupId>
                 <artifactId>ike-maven-plugin</artifactId>
                 <version>${network.ike.tooling__GA__ike-tooling__VERSION}</version>
-                <configuration>
-                    <!-- Nexus (ike-staging) is the whole story. -->
-                    <ike.publishToCentral>false</ike.publishToCentral>
-                    <!-- No gh-pages site for this repository. The site is
-                         still BUILT during the draft phase, which is where
-                         it earns its keep — it is the javadoc gate. -->
-                    <publishSite>false</publishSite>
-                    <!-- Not registered in the cascade, so it has no entry
-                         on the IKE Network landing page to refresh. -->
-                    <ike.skip.orgSite>true</ike.skip.orgSite>
-                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
