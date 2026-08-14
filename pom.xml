@@ -67,7 +67,7 @@
         <publishSite>false</publishSite>
         <!-- Not registered in the cascade, so there is no entry on the IKE
              Network landing page to refresh. -->
-        <ike.skip.orgSite>true</ike.skip.orgSite><ike-tooling.version>${network.ike.tooling__GA__ike-tooling__VERSION}</ike-tooling.version>
+        <ike.skip.orgSite>true</ike.skip.orgSite>
     </properties>
 
     <repositories>
