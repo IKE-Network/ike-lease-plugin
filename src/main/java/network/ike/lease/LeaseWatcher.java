@@ -125,7 +125,24 @@ public final class LeaseWatcher implements Disposable {
         }
     }
 
-    private void standDown(Project project, String workingSet, LeaseCli lease) {
+    /**
+     * Saves every document and closes the project, because this machine no
+     * longer holds the working set's lease.
+     *
+     * <p>Saving first is the point: the work in flight has to reach the
+     * taking machine through the sync layer rather than being stranded
+     * behind an unsaved buffer.
+     *
+     * <p>Shared with {@link LeaseProjectListener}, which reaches the same
+     * outcome by a different route — the operator declining to take over a
+     * working set someone else holds. There is exactly one way to stand
+     * down, so there is exactly one implementation of it.
+     *
+     * @param project    the project to save and close
+     * @param workingSet the working-set directory name
+     * @param lease      the bridge used to describe the current holder
+     */
+    static void standDown(Project project, String workingSet, LeaseCli lease) {
         ApplicationManager.getApplication().invokeLater(() -> {
             FileDocumentManager.getInstance().saveAllDocuments();
             LeaseProjectListener.LeaseNotifier.warn(project,
