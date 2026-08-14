@@ -12,7 +12,7 @@
     </parent>
 
     <artifactId>ike-lease-plugin</artifactId>
-    <version>3-SNAPSHOT</version>
+    <version>3</version>
     <packaging>jar</packaging>
 
     <name>IKE Working-Set Leases — IntelliJ Plugin</name>
@@ -67,7 +67,7 @@
         <publishSite>false</publishSite>
         <!-- Not registered in the cascade, so there is no entry on the IKE
              Network landing page to refresh. -->
-        <ike.skip.orgSite>true</ike.skip.orgSite>
+        <ike.skip.orgSite>true</ike.skip.orgSite><ike-tooling.version>${network.ike.tooling__GA__ike-tooling__VERSION}</ike-tooling.version>
     </properties>
 
     <repositories>
