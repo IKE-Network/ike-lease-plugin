@@ -53,11 +53,30 @@ JetBrains' own Maven repository. The result,
 *Settings → Plugins → ⚙ → Install Plugin from Disk*, or by unzipping into
 the IDE's `plugins/` directory. Either way, restart the IDE.
 
-Releases are published to the internal Nexus (`ike-staging`, inherited
-from `ike-base-parent`) and attached to the GitHub release. Never to Maven
-Central: the parent's JReleaser configuration is bound to no lifecycle
-phase, so inheriting it carries no obligation to publish anywhere public,
-and an IDE plugin has no business on Central.
+=== Releasing
+
+Two steps, both from a clean `main`:
+
+[source,bash]
+----
+mvn ike:release-draft      # prints the plan; changes nothing
+mvn ike:release-publish    # executes it
+----
+
+`release-draft` is a dry run. It reports the version it would cut, runs
+the javadoc gate, and prints every local and external step in order —
+read it before running `release-publish`.
+
+Releases go to the internal Nexus (`ike-staging`, inherited from
+`ike-base-parent`) and to the GitHub release. *Never to Maven Central.*
+Note that this takes a deliberate override: `ike-base-parent` sets
+`ike.publishToCentral` to `true`, so inheriting it opts a repository into
+Central, and `<properties>` here sets it back to `false`. These goals
+read POM *properties* — the same names in a plugin `<configuration>`
+block are reported unknown and silently do nothing.
+
+An IDE plugin has no business on Central, and its dependencies are
+JetBrains platform artifacts that nothing outside this build resolves.
 
 === Where the platform artifacts come from
 
