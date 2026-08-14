@@ -13,6 +13,9 @@ import java.nio.file.Path;
 import java.nio.file.StandardWatchEventKinds;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
+import java.util.Collections;
+import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -38,6 +41,15 @@ public final class LeaseWatcher implements Disposable {
      * so sweeping more often than that costs nothing.
      */
     private static final long SWEEP_INTERVAL_NANOS = 60L * 1_000_000_000L;
+
+    /**
+     * Projects with a stand-down already queued on the event dispatch
+     * thread. Weakly held, so a project disposed before its stand-down runs
+     * is not kept alive by this set; synchronized because stand-downs are
+     * queued from both the watcher thread and the EDT.
+     */
+    private static final Set<Project> STANDING_DOWN = Collections.synchronizedSet(
+            Collections.newSetFromMap(new WeakHashMap<>()));
 
     private volatile boolean running = true;
     private Thread thread;
@@ -138,19 +150,40 @@ public final class LeaseWatcher implements Disposable {
      * working set someone else holds. There is exactly one way to stand
      * down, so there is exactly one implementation of it.
      *
+     * <p>Guarded twice against standing the same project down more than
+     * once. A fenced project stays fenced until it closes, so between
+     * queuing this work and the event dispatch thread running it, the next
+     * watch event or sweep sees the project still open and still fenced and
+     * would queue a second stand-down — which then saves, describes and
+     * disposes a project the first one already disposed
+     * ({@code ContainerDisposedException}, ike-issues#1009). The in-flight
+     * set stops the second from being queued; the {@code isDisposed} re-check
+     * covers everything else that can dispose a project while this waits its
+     * turn, including the operator simply closing it.
+     *
      * @param project    the project to save and close
      * @param workingSet the working-set directory name
      * @param lease      the bridge used to describe the current holder
      */
     static void standDown(Project project, String workingSet, LeaseCli lease) {
+        if (!STANDING_DOWN.add(project)) {
+            return;                     // already queued for this project
+        }
         ApplicationManager.getApplication().invokeLater(() -> {
-            FileDocumentManager.getInstance().saveAllDocuments();
-            LeaseProjectListener.LeaseNotifier.warn(project,
-                    "Stood down: " + workingSet,
-                    lease.describe(workingSet)
-                            + " — documents saved and the project is closing so the "
-                            + "holder receives your work.");
-            ProjectManager.getInstance().closeAndDispose(project);
+            try {
+                if (project.isDisposed()) {
+                    return;
+                }
+                FileDocumentManager.getInstance().saveAllDocuments();
+                LeaseProjectListener.LeaseNotifier.warn(project,
+                        "Stood down: " + workingSet,
+                        lease.describe(workingSet)
+                                + " — documents saved and the project is closing so the "
+                                + "holder receives your work.");
+                ProjectManager.getInstance().closeAndDispose(project);
+            } finally {
+                STANDING_DOWN.remove(project);
+            }
         });
     }
 
