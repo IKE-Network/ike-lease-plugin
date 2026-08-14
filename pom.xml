@@ -7,7 +7,7 @@
 
     <groupId>network.ike</groupId>
     <artifactId>ike-lease-plugin</artifactId>
-    <version>1-SNAPSHOT</version>
+    <version>1</version>
     <packaging>jar</packaging>
 
     <name>IKE Working-Set Leases — IntelliJ Plugin</name>
