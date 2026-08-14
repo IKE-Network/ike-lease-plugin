@@ -44,6 +44,8 @@
         <maven.compiler.release>21</maven.compiler.release>
         <idea.build>262.9437.185</idea.build>
         <idea.groupId>com.jetbrains.intellij.platform</idea.groupId>
+        <network.ike.tooling__GA__ike-tooling__VERSION>245</network.ike.tooling__GA__ike-tooling__VERSION>
+        <network.ike.tooling__GA__ike-tooling__ALIAS>ike-tooling.version</network.ike.tooling__GA__ike-tooling__ALIAS>
     </properties>
 
     <repositories>
@@ -131,6 +133,39 @@
             </resource>
         </resources>
         <plugins>
+            <!-- Releases run through the IKE release goals rather than by
+                 hand: `mvn ike:release-draft` does the whole local phase
+                 (release branch, version, build, site pre-flight as the
+                 javadoc gate, commit, tag, merge, bump), and
+                 `mvn ike:release-publish` does the external half.
+
+                 No executions — nothing here binds to a lifecycle phase.
+                 The declaration exists to pin the version the `ike:`
+                 prefix resolves to, so a release is reproducible rather
+                 than dependent on whatever the local repository happens
+                 to hold.
+
+                 The three settings below are what makes a standalone,
+                 cascade-unregistered repository behave. publishToCentral
+                 is already false by default; it is stated because this
+                 artifact must never go to Central, and a default is a
+                 weaker guarantee than a declaration. -->
+            <plugin>
+                <groupId>network.ike.tooling</groupId>
+                <artifactId>ike-maven-plugin</artifactId>
+                <version>${network.ike.tooling__GA__ike-tooling__VERSION}</version>
+                <configuration>
+                    <!-- Nexus (ike-staging) is the whole story. -->
+                    <ike.publishToCentral>false</ike.publishToCentral>
+                    <!-- No gh-pages site for this repository. The site is
+                         still BUILT during the draft phase, which is where
+                         it earns its keep — it is the javadoc gate. -->
+                    <publishSite>false</publishSite>
+                    <!-- Not registered in the cascade, so it has no entry
+                         on the IKE Network landing page to refresh. -->
+                    <ike.skip.orgSite>true</ike.skip.orgSite>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-assembly-plugin</artifactId>
