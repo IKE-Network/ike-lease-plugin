@@ -44,7 +44,7 @@
         <maven.compiler.release>21</maven.compiler.release>
         <idea.build>262.9437.185</idea.build>
         <idea.groupId>com.jetbrains.intellij.platform</idea.groupId>
-        <network.ike.tooling__GA__ike-tooling__VERSION>245</network.ike.tooling__GA__ike-tooling__VERSION>
+        <network.ike.tooling__GA__ike-tooling__VERSION>246</network.ike.tooling__GA__ike-tooling__VERSION>
         <network.ike.tooling__GA__ike-tooling__ALIAS>ike-tooling.version</network.ike.tooling__GA__ike-tooling__ALIAS>
 
         <!-- Release behaviour for the IKE release goals. These are read as
