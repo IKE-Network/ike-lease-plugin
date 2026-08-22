@@ -134,6 +134,14 @@
             <version>26.0.2</version>
             <scope>provided</scope>
         </dependency>
+        <!-- The materializer core's tests run real git in temp directories
+             — no mocks; the thing under test is a git-command sequence. -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.11.4</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
