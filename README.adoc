@@ -1,22 +1,56 @@
-= IKE Working-Set Leases — IntelliJ Plugin
+= IKE Working-Set Leases
 
-The third enforcement arm of the working-set lease design
-(`dev-working-set-lease` in ike-lab-documents; tracked in
-`IKE-Network/ike-issues#1002`). The other two — the lease protocol in
-`~/ike-dev/scripts/lease.sh` and the Claude `PreToolUse` fence — are
-already in force.
+The working-set lease machinery of the multi-machine development fabric
+(`dev-working-set-lease` in ike-lab-documents; delivered under
+`IKE-Network/ike-issues#1002`): one writer at a time per working set
+under `~/ike-dev`, with the synced lease record as both grant and bus.
+Two Maven modules, one reactor (artifact `network.ike:ike-lease`):
 
-== What it does
+[cols="1,3", options="header"]
+|===
+| Module | What it is
 
-Opening a project *is* the acquisition gesture. There is no separate
-claim step to remember.
+| `ike-lease-core`
+| **The canonical lease protocol** (`LeaseProtocol` — verbs, epoch
+  fencing, TTL staleness, reconcile-on-read, confirmed acquisition,
+  ref stamps) plus everything decision-shaped around it: git-state
+  materialization (`Materializer`), root ref alignment (`RefAligner` /
+  `RefStamper`, ike-issues#1069), the origin manifest
+  (`scripts/origins.conf` → `OriginManifest`), the reconciliation
+  daemon (`LeaseDaemon`, ike-issues#1006), and the headless CLIs
+  (`LeaseProtocolCli`, `MaterializeCli`). IntelliJ-free by
+  construction — `module-info` imports nothing from `com.intellij`.
+
+| `ike-lease-plugin`
+| The IntelliJ host: a thin adapter contributing the trigger (the open
+  gesture), the interaction surface (dialogs, balloons, progress), and
+  IDE cleanup (VCS-mapping refresh). `LeaseProjectListener` +
+  `LeaseWatcher` acquire/renew, `MaterializeOnOpen` materializes and
+  aligns after the confirmed acquisition, and `SiblingPrePushGuard`
+  refuses pushes from a sibling working set to a non-local remote
+  (ike-issues#992).
+|===
+
+`~/ike-dev/scripts/lease.sh` is a *wrapper*: it finds the newest core
+jar and execs `LeaseProtocolCli` (ike-issues#1067). Every caller — the
+Claude fence, the operator, this plugin — runs the same single
+implementation, because a fencing system whose halves disagree about
+epochs or staleness is worse than no fencing at all. The equivalence
+suite in `ike-lease-core` holds the port byte-for-byte against a frozen
+copy of the shell v2 it replaced.
+
+== What the IDE host does
+
+Opening a project *is* the acquisition gesture — confirmed against the
+sync-propagation race (write, wait out the settle window, re-read).
+There is no separate claim step to remember.
 
 [cols="1,3", options="header"]
 |===
 | Lease state on open | Behaviour
 
 | free or expired
-| acquired silently, balloon confirms
+| acquired silently (confirmed), balloon confirms
 
 | held live by another machine
 | takeover dialog — take over, or continue read-only
@@ -25,66 +59,77 @@ claim step to remember.
 | save all documents, notify, close the project
 |===
 
+After the confirmed acquisition the open gesture also repairs git
+state, tree-untouched in both directions:
+
+* a **bare tree** (`.git` never syncs) is *materialized* — roots from
+  the synced origin manifest, siblings wired parent-first to their
+  local parent member paths;
+* **stale refs** are *aligned* to the `stamp:` lines the previous
+  holder wrote into the lease record at renew/release — fetch, move
+  the branch ref and HEAD, `reset --mixed`; the tip wins over a stale
+  stamp, unpushed history is reported and never chased, and local-only
+  divergence refuses the move rather than orphaning commits.
+
 Closing a project releases its lease, so the next machine to open it
 acquires in silence rather than meeting a dialog.
 
-The protocol itself is *not* re-implemented here: every operation shells
-out to `scripts/lease.sh` through `LeaseCli`. A fencing system whose two
-halves disagree about epochs or staleness is worse than one with no
-fencing at all, so there is exactly one implementation.
+== Installing
+
+[source,bash]
+----
+./mvnw verify
+----
+
+The result, `ike-lease-plugin/target/ike-lease-plugin-<version>.zip`,
+carries **both jars** under `ike-lease-plugin/lib/` — the IDE adapter
+and the core. Unzip it into the IDE's `plugins/` directory (or use
+*Settings → Plugins → ⚙ → Install Plugin from Disk*) and restart the
+IDE. Installing the zip is also what provisions the command line:
+`lease.sh` and `lease-daemon.sh` glob the installed `lib/` for the
+core jar, so the IDE install serves the headless CLIs and the launchd
+daemon too. `scripts/setup-machine.sh` performs the install as part of
+bringing a machine into the fleet.
 
 == Building — Maven, not Gradle
 
 JetBrains' supported toolchain is Gradle, and what it buys is mostly
-ceremony this plugin does not need: SDK download, a `runIde` sandbox, the
-Marketplace verifier, signing and publishing. This plugin touches only
-core platform APIs, will never see the Marketplace, and a plugin
-distribution is just a zip with a jar under `lib/`. Maven covers that, and
-keeps one build tool in the house.
-
-[source,bash]
-----
-mvn package
-----
-
-Nothing to install first: the build resolves the IntelliJ platform from
-JetBrains' own Maven repository. The result,
-`target/ike-lease-plugin-<version>.zip`, installs through
-*Settings → Plugins → ⚙ → Install Plugin from Disk*, or by unzipping into
-the IDE's `plugins/` directory. Either way, restart the IDE.
+ceremony this plugin does not need: SDK download, a `runIde` sandbox,
+the Marketplace verifier, signing and publishing. This plugin touches
+only core platform APIs, will never see the Marketplace, and a plugin
+distribution is just a zip with jars under `lib/`. Maven covers that,
+and keeps one build tool in the house.
 
 === Releasing
 
-Two steps, both from a clean `main`:
+Two steps, both from a clean `main` (a milestone `ike-lease v<N>` must
+exist on ike-issues):
 
 [source,bash]
 ----
-mvn ike:release-draft      # prints the plan; changes nothing
-mvn ike:release-publish    # executes it
+./mvnw ike:release-draft      # prints the plan; changes nothing
+op run --env-file ~/.config/ike/release.env -- ./mvnw ike:release-publish -B
 ----
-
-`release-draft` is a dry run. It reports the version it would cut, runs
-the javadoc gate, and prints every local and external step in order —
-read it before running `release-publish`.
 
 Releases go to the internal Nexus (`ike-staging`, inherited from
 `ike-base-parent`) and to the GitHub release. *Never to Maven Central.*
 Note that this takes a deliberate override: `ike-base-parent` sets
-`ike.publishToCentral` to `true`, so inheriting it opts a repository into
-Central, and `<properties>` here sets it back to `false`. These goals
-read POM *properties* — the same names in a plugin `<configuration>`
-block are reported unknown and silently do nothing.
+`ike.publishToCentral` to `true`, so inheriting it opts a repository
+into Central, and `<properties>` here sets it back to `false`. These
+goals read POM *properties* — the same names in a plugin
+`<configuration>` block are reported unknown and silently do nothing.
 
 An IDE plugin has no business on Central, and its dependencies are
 JetBrains platform artifacts that nothing outside this build resolves.
 
 === Where the platform artifacts come from
 
-Five published artifacts, all from JetBrains' repository, all `provided`:
+Five published artifacts, all from JetBrains' repository, all
+`provided`, all confined to the `ike-lease-plugin` module:
 
 [cols="1,3", options="header"]
 |===
-| Artifact | What this plugin takes from it
+| Artifact | What the IDE host takes from it
 
 | `platform:core`
 | `Project`, `ApplicationManager`, `Service`, `FileDocumentManager`,
@@ -97,83 +142,45 @@ Five published artifacts, all from JetBrains' repository, all `provided`:
 |===
 
 Both `intellij-repository/releases` and `intellij-dependencies` are
-declared, because the platform's own transitive dependencies
-(`intellij-deps-fastutil` and friends) live in the second; without it the
-resolver fails on those rather than on the platform jars, which makes the
-failure look like the wrong problem.
+declared (proxied through the internal Nexus), because the platform's
+own transitive dependencies (`intellij-deps-fastutil` and friends)
+live in the second; without it the resolver fails on those rather than
+on the platform jars, which makes the failure look like the wrong
+problem. The earlier `install-idea-sdk.sh` copy-jars-from-the-IDE
+approach was falsified and deleted — the published slice is
+sufficient; the classes thought missing live in `util`,
+`project-model`, and `ide`.
 
-This replaced `install-idea-sdk.sh`, which copied eight jars out of the
-locally installed IDE under the synthetic groupId
-`com.jetbrains.intellij.local`. That script existed on the belief that
-JetBrains published too thin a slice to build against — `platform:core`
-has no `Disposable`, no `ProjectManager`, no `Messages`. The belief came
-from examining only `core`; those classes are published, in `util`,
-`project-model` and `ide`. The bucket serves no directory listing, which
-is why the right combination went unfound rather than being unavailable.
+== History
 
-The script also made the build unreproducible anywhere without IntelliJ
-installed — which is every CI agent — so it had to go regardless.
+Field milestones, condensed (the full engineering narrative lives in
+the design topic and the closed issues):
 
-`system`-scoped dependencies pointing straight at the IDE were the other
-rejected route; Maven 4 has retired that scope.
+* *2026-08-13* — first install on two machines; IDE-to-IDE takeover
+  verified both directions. Two defects found by the run and fixed:
+  `StartupActivity` deprecation (watcher now starts from
+  `projectOpened`) and the renewal gap — nothing renewed an idle open
+  project's lease, so it silently expired; the watcher now sweeps
+  every open project every 60 seconds.
+* *2026-08-22* — materializer field-passed cross-machine
+  (ike-issues#1057); protocol port flipped, `lease.sh` became the
+  wrapper (#1067); daemon live on the fleet (#1006); ref alignment
+  delivered and field-proven on all three machines (#1069). Released
+  as `ike-lease` 5, installed fleet-wide; this repository is
+  `IKE-Network/ike-lease-plugin`, per-machine installs via
+  `setup-machine.sh`, no cascade registration by design.
 
-== Status — working, takeover verified
-
-Installed into IntelliJ IDEA Ultimate 2026.2.1 (IU-262.9437.185) and
-exercised end to end on 2026-08-13:
-
-* the plugin loaded, and opening projects acquired their leases — three
-  open projects, three lease records, no interaction needed;
-* a forced takeover from the other machine's command line was noticed by
-  the watcher, which saved documents, posted the balloon, and closed the
-  project;
-* nothing in the plugin threw.
-
-Installed on both machines and exercised IDE-to-IDE on 2026-08-13: the
-Studio's plugin took `ike-komet-wsr`, and the MacBook closed it within
-five seconds of the record arriving.
-
-Two defects that run exposed, both fixed. `StartupActivity` is deprecated
-— the platform logged "Migrate … to ProjectActivity" on every project
-open — so the watcher is now started from `projectOpened` instead, and
-the class is gone. Its replacement is a Kotlin coroutine interface that
-Java cannot implement cleanly, and the watcher is application-level and
-idempotent, so driving it from the first project open is equivalent.
-
-More seriously, *nothing renewed a lease while a project sat open*. A
-project open for twenty-nine minutes without edits let its ten-minute
-lease lapse, and the other machine then took it **silently** — an expired
-lease needs no permission, so the takeover dialog that protects live work
-never appeared. Renewal is the holder's job in this model, and the holder
-was not doing it. The watcher now sweeps every minute and re-asserts the
-lease of every open project (the lease script itself only rewrites at
-half-life, so the sweep is nearly free). Verified: an idle open project
-renewed at the five-minute mark and holds its lease indefinitely.
-
-Propagation of the takeover took about two and a half minutes in that
-run, against roughly five seconds when measured in isolation: Syncthing
-was mid-scan of the whole 42,000-file folder. The lease is delivered
-promptly *when the sync layer is idle*, and the design should not assume
-better.
-
-== Open decisions
-
-* *Where this lives.* A plain directory under `~/ike-dev` today — no git
-  repo, no remote, no cascade registration. Whether it becomes its own
-  repo (`ike-lease-plugin`, matching the artifact-id == repo ==
-  directory convention) is unsettled.
-* *Nexus.* The IDE jars are not on Maven Central; JetBrains runs its own
-  repository. If CI ever builds this plugin, proxy JetBrains'
-  repositories through Nexus rather than uploading IDE jars into it —
-  IntelliJ IDEA *Ultimate* is commercial software, and hosting its jars
-  is redistribution. A proxy caches without that question arising.
+One operational caveat that stays true: lease propagation is prompt
+(seconds) *when the sync layer is idle*, and minutes when Syncthing is
+mid-scan of the whole folder — the design does not assume better,
+which is what the confirmed-acquisition settle window is for.
 
 == Testing the takeover end to end
 
-With the plugin installed on both machines, open the same working set on
-each in turn. The second machine should raise the takeover dialog; on
-confirming, the first should save, notify, and close within a few seconds
-— the delay being the lease record's propagation, not any
+With the plugin installed on both machines, open the same working set
+on each in turn. The second machine should raise the takeover dialog;
+on confirming, the first should save, notify, and close within a few
+seconds — the delay being the lease record's propagation, not any
 machine-to-machine call.
 
 The same protocol is exercisable from the command line at any time:
