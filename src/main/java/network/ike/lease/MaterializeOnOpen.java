@@ -15,7 +15,6 @@ import org.jetbrains.annotations.NotNull;
 
 import java.nio.file.Path;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import network.ike.lease.LeaseProjectListener.LeaseNotifier;
 import network.ike.lease.core.MaterializeReport;
@@ -117,15 +116,18 @@ final class MaterializeOnOpen {
         }
         if (refused > 0) {
             LeaseNotifier.warn(project, "Materialization incomplete",
-                    detailLines(report, Action.REFUSED));
+                    refusedSummary(report, workingSet));
         }
         if (legacy > 0) {
             LeaseNotifier.notification(project,
                     "Sibling has remote-remote origins",
                     legacy + (legacy == 1 ? " repository chains" :
                             " repositories chain") + " to GitHub instead of "
-                            + "the local parent (ike-issues#992):\n"
-                            + detailLines(report, Action.REMOTE_ORIGIN_LEGACY),
+                            + "the local parent (ike-issues#992):<br/>"
+                            + memberSummary(report,
+                                    Action.REMOTE_ORIGIN_LEGACY, workingSet)
+                            + "<br/>Repair re-points origins only — tree and "
+                            + "branches are untouched.",
                     NotificationType.WARNING,
                     NotificationAction.createSimple("Repair to local origins",
                             () -> repairInBackground(project, lease,
@@ -149,7 +151,7 @@ final class MaterializeOnOpen {
                                         + " re-pointed to the local parent.");
                     } else {
                         LeaseNotifier.warn(project, "Repair incomplete",
-                                detailLines(report, Action.REFUSED));
+                                refusedSummary(report, workingSet));
                     }
                 });
             }
@@ -179,11 +181,68 @@ final class MaterializeOnOpen {
         }
     }
 
-    private static String detailLines(MaterializeReport report,
-                                      Action action) {
-        return report.entries().stream()
+    /** How many members a balloon names before "… and N more". */
+    private static final int BALLOON_MEMBER_CAP = 6;
+
+    /**
+     * Balloon-facing member list for one action: names relative to the
+     * working set, comma-joined, capped. The full per-repository detail
+     * stays where it belongs — {@code MaterializeCli verify} and the
+     * Notifications tool window — a balloon carries the diagnosis once,
+     * never sixteen rationale sentences. (Balloon content is HTML: plain
+     * newlines collapse to spaces, which is exactly the wall of text this
+     * formatter replaces.)
+     *
+     * @param report     the operation's report
+     * @param action     the action to list members for
+     * @param workingSet the working set the paths are relativized against
+     * @return the capped, comma-joined member names
+     */
+    private static String memberSummary(MaterializeReport report,
+                                        Action action, String workingSet) {
+        return capped(report.entries().stream()
                 .filter(entry -> entry.action() == action)
-                .map(MaterializeReport.Entry::render)
-                .collect(Collectors.joining("\n"));
+                .map(entry -> memberName(entry.path(), workingSet))
+                .toList(), ", ");
+    }
+
+    /**
+     * Balloon-facing refusal list: member name and reason per line, capped.
+     *
+     * @param report     the operation's report
+     * @param workingSet the working set the paths are relativized against
+     * @return the capped, {@code <br/>}-joined refusal lines
+     */
+    private static String refusedSummary(MaterializeReport report,
+                                         String workingSet) {
+        return capped(report.entries().stream()
+                .filter(entry -> entry.action() == Action.REFUSED)
+                .map(entry -> memberName(entry.path(), workingSet) + ": "
+                        + escape(entry.detail()))
+                .toList(), "<br/>");
+    }
+
+    private static String memberName(String path, String workingSet) {
+        if (path.equals(workingSet)) {
+            return "(root)";
+        }
+        String prefix = workingSet + "/";
+        return path.startsWith(prefix)
+                ? path.substring(prefix.length()) : path;
+    }
+
+    private static String capped(List<String> items, String separator) {
+        if (items.size() <= BALLOON_MEMBER_CAP) {
+            return String.join(separator, items);
+        }
+        return String.join(separator, items.subList(0, BALLOON_MEMBER_CAP))
+                + separator + "… and "
+                + (items.size() - BALLOON_MEMBER_CAP) + " more";
+    }
+
+    private static String escape(String text) {
+        return text.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
     }
 }
