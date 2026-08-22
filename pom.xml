@@ -11,6 +11,11 @@
         <version>15</version>
     </parent>
 
+    <!-- Explicit even though it matches the parent's: the release
+         goals derive the root GA textually, and an inherited groupId
+         mis-derived release 4's coherence gate (ike-issues#1068). Every
+         released root declares its group; now this one does too. -->
+    <groupId>network.ike</groupId>
     <artifactId>ike-lease</artifactId>
     <version>5-SNAPSHOT</version>
     <packaging>pom</packaging>
