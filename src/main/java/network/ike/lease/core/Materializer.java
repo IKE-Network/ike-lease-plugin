@@ -495,7 +495,14 @@ public final class Materializer {
     }
 
     private static boolean hasGit(Path directory) {
-        return Files.exists(directory.resolve(".git"));
+        Path git = directory.resolve(".git");
+        // A gitfile (worktree or submodule pointer) is real git state. A
+        // .git DIRECTORY is real only when it has a HEAD: the sync
+        // layer's `(?d).git/` pattern excludes contents but carries the
+        // directory entry itself, so peers hold empty ".git" husks —
+        // measured fleet-wide 2026-08-22: every root and sibling on both
+        // peer machines was a husk, invisible to an existence check.
+        return Files.isRegularFile(git) || Files.exists(git.resolve("HEAD"));
     }
 
     private static String parseDefaultBranch(String lsRemoteOutput) {
@@ -511,13 +518,23 @@ public final class Materializer {
 
     private void rollBackGitDirectory(Path repoDir) {
         Path gitDir = repoDir.resolve(".git");
+        // Contents only — NEVER the .git directory entry itself. The sync
+        // layer indexes the entry (that is how the fleet's empty husks
+        // propagate), so deleting it here would propagate as a deletion,
+        // and `(?d)` then permits receivers to delete their real, ignored
+        // .git contents to honor it — the likeliest mechanism of the
+        // 2026-08 fleet-wide .git loss. An empty .git left behind is the
+        // fleet's ordinary husk condition, and this class now reads it as
+        // bare, so the retry story is unchanged.
         try (Stream<Path> tree = Files.walk(gitDir)) {
             for (Path path : tree.sorted(Comparator.reverseOrder()).toList()) {
-                Files.deleteIfExists(path);
+                if (!path.equals(gitDir)) {
+                    Files.deleteIfExists(path);
+                }
             }
         } catch (IOException e) {
             progress.accept("could not roll back " + gitDir + ": "
-                    + e.getMessage() + " — remove it by hand before retrying");
+                    + e.getMessage() + " — empty it by hand before retrying");
         }
     }
 }

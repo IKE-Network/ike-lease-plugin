@@ -98,6 +98,29 @@ class MaterializerTest {
     }
 
     @Test
+    void emptyGitHuskReadsAsBareAndMaterializes() throws IOException {
+        // The sync layer's (?d).git/ pattern carries the .git directory
+        // entry but none of its contents, so a peer receives a tree with
+        // an EMPTY .git husk — measured fleet-wide 2026-08-22. That husk
+        // must read as bare, or the materializer skips exactly the
+        // machines it exists for.
+        Path ikeDev = ikeDev();
+        Path upstream = upstreamRepo("upstream", "main");
+        Path root = ikeDev.resolve("my-root");
+        copyTree(upstream, root);
+        Files.createDirectories(root.resolve(".git"));
+
+        MaterializeReport report = materializer(ikeDev,
+                "my-root " + upstream + "\n")
+                .materialize(new WorkingSetName("my-root"));
+
+        assertTrue(report.ok(), report.entries().toString());
+        assertEquals(1, report.count(Action.MATERIALIZED));
+        assertEquals("main", currentBranch(root));
+        assertEquals("", porcelainStatus(root));
+    }
+
+    @Test
     void secondRunIsIdempotent() throws IOException {
         Path ikeDev = ikeDev();
         Path upstream = upstreamRepo("upstream", "main");
