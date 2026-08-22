@@ -26,7 +26,12 @@ public final class LeaseProtocolCli {
      *             with their arguments, as {@code lease.sh} always took them
      */
     public static void main(String[] args) {
-        String home = System.getProperty("user.home");
+        // HOME the environment variable, not the JVM's user.home: the
+        // shell always honored $HOME, sandboxed test suites depend on it,
+        // and the OS-derived property ignores both. (The v2 shell suite
+        // caught exactly this on the flip's first run.)
+        String home = orDefault(System.getenv("HOME"),
+                System.getProperty("user.home"));
         String ikeDev = orDefault(System.getenv("IKE_DEV"),
                 home + "/ike-dev");
         String ttl = orDefault(System.getenv("IKE_LEASE_TTL"), "PT10M");

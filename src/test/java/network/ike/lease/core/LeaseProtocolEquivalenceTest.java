@@ -507,6 +507,34 @@ class LeaseProtocolEquivalenceTest {
         assertEquals(WS + "\n", java.stdout());
     }
 
+
+    /**
+     * The CLI honors the {@code HOME} environment variable, as the shell
+     * always did — the JVM's OS-derived {@code user.home} ignores it, and
+     * the sandboxed suites (this one, and the v2 shell suite that caught
+     * the regression) depend on it.
+     */
+    @Test
+    void cli_honorsTheHomeEnvironmentVariable() throws Exception {
+        Sandbox sandbox = Sandbox.create(tempDir.resolve("cli-home"));
+        String fresh = freshStamp();
+        sandbox.writeRecord(WS + ".lease",
+                record(WS, "held", ME, 3, fresh, fresh));
+        ProcessBuilder builder = new ProcessBuilder("java", "-cp",
+                "target/classes", "network.ike.lease.core.LeaseProtocolCli",
+                "status", WS);
+        builder.environment().put("HOME", sandbox.home().toString());
+        builder.environment().put("IKE_DEV", sandbox.ikeDev().toString());
+        Process process = builder.start();
+        process.getOutputStream().close();
+        String out = new String(process.getInputStream().readAllBytes(),
+                StandardCharsets.UTF_8);
+        assertTrue(process.waitFor(30, TimeUnit.SECONDS), "CLI hung");
+        assertEquals(0, process.exitValue());
+        assertTrue(out.contains("MINE (" + ME),
+                "the sandbox identity must be honored, got: " + out);
+    }
+
     @Test
     void list_describesEveryRecordInNameOrder() throws Exception {
         String fresh = freshStamp();
