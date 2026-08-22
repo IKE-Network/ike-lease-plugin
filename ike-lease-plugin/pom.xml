@@ -5,10 +5,12 @@
                              http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <!-- Maven 4 reactor inference: the parent version is deliberately
+         omitted, so the release's version-set never leaves a literal
+         SNAPSHOT behind (the guard that stopped release 4's first run). -->
     <parent>
         <groupId>network.ike</groupId>
         <artifactId>ike-lease</artifactId>
-        <version>4-SNAPSHOT</version>
     </parent>
 
     <artifactId>ike-lease-plugin</artifactId>
