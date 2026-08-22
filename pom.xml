@@ -11,234 +11,56 @@
         <version>15</version>
     </parent>
 
-    <artifactId>ike-lease-plugin</artifactId>
+    <artifactId>ike-lease</artifactId>
     <version>4-SNAPSHOT</version>
-    <packaging>jar</packaging>
+    <packaging>pom</packaging>
 
-    <name>IKE Working-Set Leases — IntelliJ Plugin</name>
+    <name>IKE Working-Set Leases</name>
     <description>
-        Enforces single-writer working-set leases across Syncthing-paired
-        machines. Opening a project acquires its lease; being fenced by a
-        takeover elsewhere saves open documents and closes the project.
+        Single-writer working-set leases across Syncthing-paired machines:
+        the protocol and materializer core (a plain-Java library the ws:
+        goals can consume), and the IntelliJ enforcement plugin that hosts
+        it at the open gesture. Split per IKE-Network/ike-issues#1067.
     </description>
+
+    <modules>
+        <module>ike-lease-core</module>
+        <module>ike-lease-plugin</module>
+    </modules>
 
     <!--
         Distribution is the internal Nexus (ike-staging, inherited from
-        ike-base-parent), never Maven Central. The parent's JReleaser
-        configuration is bound to no lifecycle phase, so inheriting it
-        carries no obligation to publish anywhere public — and an IDE
-        plugin has no business on Central.
+        ike-base-parent), never Maven Central. Release behaviour is read
+        by the ike: release goals as POM PROPERTIES, not plugin
+        <configuration> — names set in a <configuration> block are
+        silently reported unknown and do nothing.
 
-        The IntelliJ platform artifacts come from JetBrains' own Maven
-        repository, declared below. An earlier reading of that repository
-        concluded it published too thin a slice to build against, because
-        only `core` was examined; the classes missing from `core` are in
-        `util`, `project-model`, `ide` and `ide-core`. Every type this
-        plugin touches is available, which is what retired
-        install-idea-sdk.sh and its locally-installed-IDE jars — those
-        could never be resolved by a machine without IntelliJ on it,
-        which is every CI agent.
+        ike.publishToCentral OVERRIDES ike-base-parent, which sets it to
+        true; inheriting the parent otherwise opts a repository into
+        Maven Central publishing, and nothing here belongs there.
     -->
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>21</maven.compiler.release>
-        <idea.build>262.9437.185</idea.build>
-        <idea.groupId>com.jetbrains.intellij.platform</idea.groupId>
         <network.ike.tooling__GA__ike-tooling__VERSION>246</network.ike.tooling__GA__ike-tooling__VERSION>
         <network.ike.tooling__GA__ike-tooling__ALIAS>ike-tooling.version</network.ike.tooling__GA__ike-tooling__ALIAS>
-
-        <!-- Release behaviour for the IKE release goals. These are read as
-             POM PROPERTIES, not as plugin <configuration> — the same names
-             set in a <configuration> block are silently reported unknown
-             and do nothing, which is exactly the sort of failure a release
-             should not discover by executing.
-
-             ike.publishToCentral OVERRIDES ike-base-parent, which sets it
-             to true. Inheriting the parent therefore opts a repository
-             into Maven Central publishing, and this one must never be
-             published there: an IDE plugin has no business on Central, and
-             its own dependencies are JetBrains platform artifacts that
-             nothing outside this build resolves. Nexus (ike-staging) is
-             the whole story. -->
         <ike.publishToCentral>false</ike.publishToCentral>
-        <!-- No gh-pages site for this repository. The site is still BUILT
-             during the draft phase, which is where it earns its keep — it
-             is the javadoc gate. -->
+        <!-- No gh-pages site. The site is still BUILT during the draft
+             phase, which is where it earns its keep — the javadoc gate. -->
         <publishSite>false</publishSite>
-        <!-- Not registered in the cascade, so there is no entry on the IKE
-             Network landing page to refresh. -->
+        <!-- Not registered in the cascade. -->
         <ike.skip.orgSite>true</ike.skip.orgSite>
     </properties>
 
-    <repositories>
-        <!-- The platform artifacts themselves. -->
-        <repository>
-            <id>intellij-repository-releases</id>
-            <url>https://www.jetbrains.com/intellij-repository/releases</url>
-            <snapshots><enabled>false</enabled></snapshots>
-        </repository>
-        <!-- Their transitive dependencies (intellij-deps-fastutil and
-             friends) live in a separate repository; without this one the
-             resolver 404s on them rather than on the platform jars, which
-             makes the failure look like the wrong thing. -->
-        <repository>
-            <id>intellij-dependencies</id>
-            <url>https://cache-redirector.jetbrains.com/intellij-dependencies</url>
-            <snapshots><enabled>false</enabled></snapshots>
-        </repository>
-    </repositories>
-
-    <dependencies>
-        <!-- Project, ApplicationManager, Service, FileDocumentManager,
-             ProgressManager, Task, ProgressIndicator -->
-        <dependency>
-            <groupId>${idea.groupId}</groupId>
-            <artifactId>core</artifactId>
-            <version>${idea.build}</version>
-            <scope>provided</scope>
-        </dependency>
-        <!-- Disposable, and the ComponentManager/AreaInstance types the
-             APIs above reach through -->
-        <dependency>
-            <groupId>${idea.groupId}</groupId>
-            <artifactId>util</artifactId>
-            <version>${idea.build}</version>
-            <scope>provided</scope>
-        </dependency>
-        <!-- ProjectManager, ProjectManagerListener -->
-        <dependency>
-            <groupId>${idea.groupId}</groupId>
-            <artifactId>project-model</artifactId>
-            <version>${idea.build}</version>
-            <scope>provided</scope>
-        </dependency>
-        <!-- Messages -->
-        <dependency>
-            <groupId>${idea.groupId}</groupId>
-            <artifactId>ide</artifactId>
-            <version>${idea.build}</version>
-            <scope>provided</scope>
-        </dependency>
-        <!-- NotificationGroupManager, NotificationType -->
-        <dependency>
-            <groupId>${idea.groupId}</groupId>
-            <artifactId>ide-core</artifactId>
-            <version>${idea.build}</version>
-            <scope>provided</scope>
-        </dependency>
-        <!-- ProjectLevelVcsManager, VcsDirectoryMapping — making the IDE
-             notice freshly materialized git state (ike-issues#1057). -->
-        <dependency>
-            <groupId>${idea.groupId}</groupId>
-            <artifactId>vcs</artifactId>
-            <version>${idea.build}</version>
-            <scope>provided</scope>
-        </dependency>
-        <!-- Repository, PushTarget/PushSpec/PushSource -->
-        <dependency>
-            <groupId>${idea.groupId}</groupId>
-            <artifactId>vcs-dvcs</artifactId>
-            <version>${idea.build}</version>
-            <scope>provided</scope>
-        </dependency>
-        <!-- PrePushHandler, PushInfo — the sibling local-origin guard's
-             extension point lives in the dvcs implementation module. -->
-        <dependency>
-            <groupId>${idea.groupId}</groupId>
-            <artifactId>vcs-dvcs-impl</artifactId>
-            <version>${idea.build}</version>
-            <scope>provided</scope>
-        </dependency>
-        <!-- git4idea is published under the module-name mapping
-             intellij.vcs.git → com.jetbrains.intellij.vcs. The `git`
-             artifact itself is a descriptor stub; the classes are in the
-             split modules: GitPushTarget/GitRemoteBranch in git-backend,
-             GitRemote in git-shared. -->
-        <dependency>
-            <groupId>com.jetbrains.intellij.vcs</groupId>
-            <artifactId>git-backend</artifactId>
-            <version>${idea.build}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.jetbrains.intellij.vcs</groupId>
-            <artifactId>git-shared</artifactId>
-            <version>${idea.build}</version>
-            <scope>provided</scope>
-        </dependency>
-        <!-- org.jetbrains.annotations, on platform API signatures throughout.
-             The real thing from Central, not the copy the IDE ships. -->
-        <dependency>
-            <groupId>org.jetbrains</groupId>
-            <artifactId>annotations</artifactId>
-            <version>26.0.2</version>
-            <scope>provided</scope>
-        </dependency>
-        <!-- The materializer core's tests run real git in temp directories
-             — no mocks; the thing under test is a git-command sequence. -->
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <version>5.11.4</version>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
-
     <build>
-        <resources>
-            <!-- plugin.xml is filtered so its <version> tracks this POM. -->
-            <resource>
-                <directory>src/main/resources</directory>
-                <filtering>true</filtering>
-                <includes>
-                    <include>META-INF/plugin.xml</include>
-                </includes>
-            </resource>
-            <resource>
-                <directory>src/main/resources</directory>
-                <filtering>false</filtering>
-                <excludes>
-                    <exclude>META-INF/plugin.xml</exclude>
-                </excludes>
-            </resource>
-        </resources>
         <plugins>
-            <!-- Releases run through the IKE release goals rather than by
-                 hand: `mvn ike:release-draft` does the whole local phase
-                 (release branch, version, build, site pre-flight as the
-                 javadoc gate, commit, tag, merge, bump), and
-                 `mvn ike:release-publish` does the external half.
-
-                 No executions — nothing here binds to a lifecycle phase.
-                 The declaration exists to pin the version the `ike:`
-                 prefix resolves to, so a release is reproducible rather
-                 than dependent on whatever the local repository happens
-                 to hold. Release behaviour is set in <properties> above,
-                 which is where these goals read it from. -->
+            <!-- Releases run through the IKE release goals. No executions —
+                 the declaration pins the version the `ike:` prefix resolves
+                 to, so a release is reproducible. -->
             <plugin>
                 <groupId>network.ike.tooling</groupId>
                 <artifactId>ike-maven-plugin</artifactId>
                 <version>${network.ike.tooling__GA__ike-tooling__VERSION}</version>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.7.1</version>
-                <configuration>
-                    <appendAssemblyId>false</appendAssemblyId>
-                    <descriptors>
-                        <descriptor>src/assembly/plugin-zip.xml</descriptor>
-                    </descriptors>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>plugin-zip</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
     </build>

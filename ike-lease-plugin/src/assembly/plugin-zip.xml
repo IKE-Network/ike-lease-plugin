@@ -8,7 +8,13 @@
 
             ike-lease-plugin/
               lib/
-                ike-lease-plugin-1-SNAPSHOT.jar
+                ike-lease-plugin-<version>.jar
+                ike-lease-core-<version>.jar
+
+        The dependency set carries this jar plus the runtime dependencies
+        — which is exactly the core; the provided IDE platform jars stay
+        out. The lease.sh wrapper globs the installed lib/ for the core
+        jar, so installing the zip is also what serves the headless CLIs.
 
         Install through Settings > Plugins > Install Plugin from Disk.
     -->
@@ -18,10 +24,11 @@
     </formats>
     <includeBaseDirectory>true</includeBaseDirectory>
     <baseDirectory>${project.artifactId}</baseDirectory>
-    <files>
-        <file>
-            <source>${project.build.directory}/${project.artifactId}-${project.version}.jar</source>
+    <dependencySets>
+        <dependencySet>
             <outputDirectory>lib</outputDirectory>
-        </file>
-    </files>
+            <useProjectArtifact>true</useProjectArtifact>
+            <scope>runtime</scope>
+        </dependencySet>
+    </dependencySets>
 </assembly>

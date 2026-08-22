@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>network.ike</groupId>
+        <artifactId>ike-lease</artifactId>
+        <version>4-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>ike-lease-plugin</artifactId>
+    <packaging>jar</packaging>
+
+    <name>IKE Working-Set Leases — IntelliJ Plugin</name>
+    <description>
+        The IDE host of the lease core: opening a project acquires its
+        lease and materializes its git state; being fenced by a takeover
+        elsewhere saves open documents and closes the project; sibling
+        pushes to remote remotes abort in the push dialog. Ships as a zip
+        bundling this jar and ike-lease-core under lib/.
+    </description>
+
+    <!--
+        The platform artifacts come from JetBrains' Maven repositories,
+        declared here — only this module needs them; the core stays
+        resolvable without them. An earlier reading concluded the
+        repository published too thin a slice, because only `core` was
+        examined; the classes missing from `core` live in `util`,
+        `project-model`, `ide` and `ide-core`. Both repositories are also
+        proxied on the fleet Nexus inside the ike-public group.
+    -->
+    <properties>
+        <idea.build>262.9437.185</idea.build>
+        <idea.groupId>com.jetbrains.intellij.platform</idea.groupId>
+    </properties>
+
+    <repositories>
+        <repository>
+            <id>intellij-repository-releases</id>
+            <url>https://www.jetbrains.com/intellij-repository/releases</url>
+            <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+        <!-- Their transitive dependencies (intellij-deps-fastutil and
+             friends) live in a separate repository; without it the
+             resolver 404s on them rather than on the platform jars. -->
+        <repository>
+            <id>intellij-dependencies</id>
+            <url>https://cache-redirector.jetbrains.com/intellij-dependencies</url>
+            <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <!-- The one core, this module being one of its thin hosts. -->
+        <dependency>
+            <groupId>network.ike</groupId>
+            <artifactId>ike-lease-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- Project, ApplicationManager, Service, FileDocumentManager,
+             ProgressManager, Task, ProgressIndicator -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>core</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Disposable, and the ComponentManager/AreaInstance types the
+             APIs above reach through -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>util</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- ProjectManager, ProjectManagerListener -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>project-model</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Messages -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>ide</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- NotificationGroupManager, NotificationType -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>ide-core</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- ProjectLevelVcsManager, VcsDirectoryMapping -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>vcs</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Repository, PushTarget/PushSpec/PushSource -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>vcs-dvcs</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- PrePushHandler, PushInfo -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>vcs-dvcs-impl</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- git4idea under the module-name mapping intellij.vcs.git →
+             com.jetbrains.intellij.vcs; the `git` artifact is a
+             descriptor stub — GitPushTarget/GitRemoteBranch live in
+             git-backend, GitRemote in git-shared. -->
+        <dependency>
+            <groupId>com.jetbrains.intellij.vcs</groupId>
+            <artifactId>git-backend</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.jetbrains.intellij.vcs</groupId>
+            <artifactId>git-shared</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- org.jetbrains.annotations — the real thing from Central. -->
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>26.0.2</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <resources>
+            <!-- plugin.xml is filtered so its <version> tracks this POM. -->
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>META-INF/plugin.xml</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>META-INF/plugin.xml</exclude>
+                </excludes>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>3.7.1</version>
+                <configuration>
+                    <appendAssemblyId>false</appendAssemblyId>
+                    <descriptors>
+                        <descriptor>src/assembly/plugin-zip.xml</descriptor>
+                    </descriptors>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>plugin-zip</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
