@@ -53,13 +53,6 @@ import network.ike.lease.core.MaterializeReport.Entry;
  */
 public final class Materializer {
 
-    /** Directories never descended into while discovering parent members. */
-    private static final List<String> SKIPPED_DIRECTORIES =
-            List.of(".git", ".ike", ".idea", ".stversions", "target");
-
-    /** How deep member discovery looks below the parent root. */
-    private static final int MEMBER_DISCOVERY_DEPTH = 3;
-
     private final Path ikeDev;
     private final GitRunner git;
     private final OriginManifest manifest;
@@ -439,51 +432,17 @@ public final class Materializer {
     }
 
     /**
-     * Discovers the parent's member repositories: the parent root itself,
-     * plus every git repository below it, without descending into
-     * repositories, hidden directories, or build output.
+     * Discovers the parent's member repositories — the shared
+     * {@link WorkingSetRepos} walk, so the materializer and the ref
+     * stamper (IKE-Network/ike-issues#1069) can never disagree about
+     * membership.
      *
      * @param parentDir the parent working set's directory
      * @return member paths relative to the parent root, the root itself as
      *         the empty string, shallowest first
      */
     private List<String> discoverMembers(Path parentDir) {
-        List<String> members = new ArrayList<>();
-        if (hasGit(parentDir)) {
-            members.add("");
-        }
-        collectMembers(parentDir, parentDir, 0, members);
-        members.sort(Comparator
-                .comparingInt((String member) ->
-                        member.split("/", -1).length)
-                .thenComparing(Comparator.naturalOrder()));
-        return members;
-    }
-
-    private void collectMembers(Path parentRoot, Path directory, int depth,
-                                List<String> members) {
-        if (depth >= MEMBER_DISCOVERY_DEPTH) {
-            return;
-        }
-        try (Stream<Path> children = Files.list(directory)) {
-            for (Path child : children.filter(Files::isDirectory).toList()) {
-                String childName = child.getFileName().toString();
-                if (childName.startsWith(".")
-                        || SKIPPED_DIRECTORIES.contains(childName)) {
-                    continue;
-                }
-                if (hasGit(child)) {
-                    members.add(parentRoot.relativize(child).toString());
-                } else {
-                    collectMembers(parentRoot, child, depth + 1, members);
-                }
-            }
-        } catch (IOException e) {
-            // An unreadable directory hides its members; surfacing that as
-            // a hard failure would block the readable rest. Skip it.
-            progress.accept("skipping unreadable " + directory + ": "
-                    + e.getMessage());
-        }
+        return WorkingSetRepos.discover(parentDir, progress);
     }
 
     private static Path resolveMember(Path root, String member) {
@@ -495,14 +454,7 @@ public final class Materializer {
     }
 
     private static boolean hasGit(Path directory) {
-        Path git = directory.resolve(".git");
-        // A gitfile (worktree or submodule pointer) is real git state. A
-        // .git DIRECTORY is real only when it has a HEAD: the sync
-        // layer's `(?d).git/` pattern excludes contents but carries the
-        // directory entry itself, so peers hold empty ".git" husks —
-        // measured fleet-wide 2026-08-22: every root and sibling on both
-        // peer machines was a husk, invisible to an existence check.
-        return Files.isRegularFile(git) || Files.exists(git.resolve("HEAD"));
+        return WorkingSetRepos.hasGit(directory);
     }
 
     private static String parseDefaultBranch(String lsRemoteOutput) {

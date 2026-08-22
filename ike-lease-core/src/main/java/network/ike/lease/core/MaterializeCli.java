@@ -80,19 +80,58 @@ public final class MaterializeCli {
         Materializer materializer = new Materializer(ikeDev,
                 new ProcessGitRunner(), OriginManifest.load(ikeDev),
                 line -> System.out.println("  " + line));
-        MaterializeReport report = switch (command) {
-            case "materialize" -> materializer.materialize(name);
-            case "verify" -> materializer.verify(name);
-            case "repair" -> materializer.repair(name);
-            default -> null;
-        };
-        if (report == null) {
-            return usage("unknown command: " + command);
+        RefAligner aligner = new RefAligner(ikeDev, new ProcessGitRunner(),
+                line -> System.out.println("  " + line));
+        List<RepoStamp> stamps = name.isSibling() ? List.of()
+                : RefAligner.recordedStamps(ikeDev, name.value());
+
+        // Ref alignment (ike-issues#1069) reports in the same three
+        // verbs: `verify` checks refs against the stamps offline,
+        // `repair` aligns them (fetch, move ref and HEAD, reset --mixed,
+        // tree untouched), and `materialize` aligns freshly created root
+        // repositories the same way. Roots only — a sibling's repair
+        // stays the origin re-point, and its refs are its own.
+        MaterializeReport report;
+        RefAligner.AlignReport alignment = null;
+        switch (command) {
+            case "materialize" -> {
+                report = materializer.materialize(name);
+                if (!name.isSibling() && !stamps.isEmpty()) {
+                    alignment = aligner.align(name, stamps);
+                }
+            }
+            case "verify" -> {
+                report = materializer.verify(name);
+                if (!name.isSibling() && !stamps.isEmpty()) {
+                    alignment = aligner.check(name, stamps);
+                }
+            }
+            case "repair" -> {
+                if (name.isSibling()) {
+                    report = materializer.repair(name);
+                } else {
+                    report = null;
+                    alignment = aligner.align(name, stamps);
+                }
+            }
+            default -> {
+                return usage("unknown command: " + command);
+            }
         }
-        for (MaterializeReport.Entry entry : report.entries()) {
-            System.out.println(entry.render());
+        boolean ok = true;
+        if (report != null) {
+            for (MaterializeReport.Entry entry : report.entries()) {
+                System.out.println(entry.render());
+            }
+            ok = report.ok();
         }
-        return report.ok() ? 0 : 1;
+        if (alignment != null) {
+            for (RefAligner.Entry entry : alignment.entries()) {
+                System.out.println(entry.render());
+            }
+            ok = ok && alignment.ok();
+        }
+        return ok ? 0 : 1;
     }
 
     private static int usage(String problem) {

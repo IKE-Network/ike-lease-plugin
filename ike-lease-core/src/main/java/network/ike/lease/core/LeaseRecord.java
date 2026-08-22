@@ -18,6 +18,14 @@ import java.util.Optional;
  * mixed fleet interoperates mid-rollout and the golden tests can compare
  * files literally.
  *
+ * <p>The one extension beyond v2 is the optional {@link RepoStamp} tail
+ * (IKE-Network/ike-issues#1069): zero or more {@code stamp:} lines after
+ * the v2 fields. A record without stamps serializes byte-identically to
+ * v2, and readers of any vintage tolerate both shapes — {@link #field}
+ * skips lines it does not ask for, so pre-stamp cores read stamped
+ * records untroubled (and drop the stamps on rewrite, which the design
+ * accepts: stamps are best-effort metadata, never fencing state).
+ *
  * @param workingSet the working-set directory name
  * @param state      {@code held} or {@code released}
  * @param holder     the machine id that wrote the record
@@ -25,10 +33,47 @@ import java.util.Optional;
  * @param acquired   ISO-8601 UTC acquisition stamp
  * @param renewed    ISO-8601 UTC renewal stamp
  * @param ttl        the staleness horizon, ISO-8601 duration
+ * @param stamps     the holder's per-repository ref stamps, empty for
+ *                   sibling working sets and pre-stamp records
  */
 public record LeaseRecord(String workingSet, String state, String holder,
                           long epoch, String acquired, String renewed,
-                          String ttl) {
+                          String ttl, java.util.List<RepoStamp> stamps) {
+
+    /**
+     * Canonicalizes the stamp list.
+     *
+     * @param workingSet the working-set directory name
+     * @param state      {@code held} or {@code released}
+     * @param holder     the machine id that wrote the record
+     * @param epoch      the monotonic fencing token
+     * @param acquired   ISO-8601 UTC acquisition stamp
+     * @param renewed    ISO-8601 UTC renewal stamp
+     * @param ttl        the staleness horizon, ISO-8601 duration
+     * @param stamps     the holder's per-repository ref stamps
+     */
+    public LeaseRecord {
+        stamps = stamps == null ? java.util.List.of()
+                : java.util.List.copyOf(stamps);
+    }
+
+    /**
+     * Creates a stampless record — the v2 shape.
+     *
+     * @param workingSet the working-set directory name
+     * @param state      {@code held} or {@code released}
+     * @param holder     the machine id that wrote the record
+     * @param epoch      the monotonic fencing token
+     * @param acquired   ISO-8601 UTC acquisition stamp
+     * @param renewed    ISO-8601 UTC renewal stamp
+     * @param ttl        the staleness horizon, ISO-8601 duration
+     */
+    public LeaseRecord(String workingSet, String state, String holder,
+                       long epoch, String acquired, String renewed,
+                       String ttl) {
+        this(workingSet, state, holder, epoch, acquired, renewed, ttl,
+                java.util.List.of());
+    }
 
     /**
      * Reads a field the way the shell did: the line whose first
@@ -76,7 +121,8 @@ public record LeaseRecord(String workingSet, String state, String holder,
                     parseEpoch(field(lines, "epoch").orElse("0")),
                     field(lines, "acquired").orElse(""),
                     field(lines, "renewed").orElse(""),
-                    field(lines, "ttl").orElse("")));
+                    field(lines, "ttl").orElse(""),
+                    RepoStamp.parseAll(lines)));
         } catch (IOException e) {
             return Optional.empty();
         }
@@ -84,12 +130,15 @@ public record LeaseRecord(String workingSet, String state, String holder,
 
     /**
      * Serializes exactly as {@code lease.sh} v2 wrote — the byte-for-byte
-     * contract that keeps a mixed fleet coherent.
+     * contract that keeps a mixed fleet coherent — with the optional
+     * stamp tail (IKE-Network/ike-issues#1069) appended only when stamps
+     * exist, so a stampless record stays byte-identical to v2.
      *
      * @return the file content, trailing newline included
      */
     public String serialize() {
-        return "# Working-set lease — written by scripts/lease.sh.\n"
+        StringBuilder content = new StringBuilder(
+                "# Working-set lease — written by scripts/lease.sh.\n"
                 + "# Holder has sole write access; see IKE-Network/ike-issues#1002.\n"
                 + "working-set: " + workingSet + "\n"
                 + "state: " + state + "\n"
@@ -97,7 +146,11 @@ public record LeaseRecord(String workingSet, String state, String holder,
                 + "epoch: " + epoch + "\n"
                 + "acquired: " + acquired + "\n"
                 + "renewed: " + renewed + "\n"
-                + "ttl: " + ttl + "\n";
+                + "ttl: " + ttl + "\n");
+        for (RepoStamp stamp : stamps) {
+            content.append(stamp.serialize()).append('\n');
+        }
+        return content.toString();
     }
 
     private static long parseEpoch(String raw) {

@@ -125,10 +125,20 @@ public final class LeaseProtocol {
         long epoch = record.map(LeaseRecord::epoch).orElse(0L);
         String now = ISO.format(Instant.now());
 
+        // Ref stamps (IKE-Network/ike-issues#1069): a write by the current
+        // holder refreshes them from the repositories — the holder's disk
+        // is the truth. A write that CHANGES the holder carries the read
+        // record's stamps forward instead: they describe the previous
+        // holder's refs, which is exactly the alignment target the taker
+        // is about to need, and the taker's own repositories are stale at
+        // this moment by definition.
+        List<RepoStamp> carried = record.map(LeaseRecord::stamps)
+                .orElse(List.of());
         switch (state) {
             case "MINE" -> {
                 write(workingSet, "held", me.get(), epoch,
-                        record.map(LeaseRecord::acquired).orElse(""), now);
+                        record.map(LeaseRecord::acquired).orElse(""), now,
+                        RefStamper.collect(ikeDev, workingSet));
                 if (!quiet) {
                     out.append("already held here (epoch ").append(epoch)
                             .append(") — renewed\n");
@@ -136,7 +146,7 @@ public final class LeaseProtocol {
             }
             case "FREE", "EXPIRED" -> {
                 epoch += 1;
-                write(workingSet, "held", me.get(), epoch, now, now);
+                write(workingSet, "held", me.get(), epoch, now, now, carried);
                 if (!quiet) {
                     out.append("acquired ").append(workingSet)
                             .append(" (epoch ").append(epoch)
@@ -157,7 +167,7 @@ public final class LeaseProtocol {
                     return new Outcome(1, out.toString(), err.toString());
                 }
                 epoch += 1;
-                write(workingSet, "held", me.get(), epoch, now, now);
+                write(workingSet, "held", me.get(), epoch, now, now, carried);
                 if (!quiet) {
                     out.append("TOOK OVER ").append(workingSet)
                             .append(" from ").append(prev)
@@ -252,7 +262,8 @@ public final class LeaseProtocol {
         write(workingSet, "held", machineId(err).orElse(""),
                 record.map(LeaseRecord::epoch).orElse(0L),
                 record.map(LeaseRecord::acquired).orElse(""),
-                ISO.format(Instant.now()));
+                ISO.format(Instant.now()),
+                RefStamper.collect(ikeDev, workingSet));
         return new Outcome(0, "", err.toString());
     }
 
@@ -283,10 +294,13 @@ public final class LeaseProtocol {
             return new Outcome(1, out.toString(), err.toString());
         }
         Optional<LeaseRecord> record = LeaseRecord.read(leaseFile(workingSet));
+        // The release stamp is the one that matters most: it records the
+        // refs the machine switch will align to (ike-issues#1069).
         write(workingSet, "released", me.get(),
                 record.map(LeaseRecord::epoch).orElse(0L),
                 record.map(LeaseRecord::acquired).orElse(""),
-                ISO.format(Instant.now()));
+                ISO.format(Instant.now()),
+                RefStamper.collect(ikeDev, workingSet));
         out.append("released ").append(workingSet).append('\n');
         return new Outcome(0, out.toString(), err.toString());
     }
@@ -495,9 +509,10 @@ public final class LeaseProtocol {
     }
 
     private void write(String workingSet, String state, String holder,
-                       long epoch, String acquired, String renewed) {
+                       long epoch, String acquired, String renewed,
+                       List<RepoStamp> stamps) {
         LeaseRecord record = new LeaseRecord(workingSet, state, holder, epoch,
-                acquired, renewed, defaultTtl);
+                acquired, renewed, defaultTtl, stamps);
         try {
             Path dir = ikeDev.resolve("leases");
             Files.createDirectories(dir);

@@ -22,6 +22,8 @@ import network.ike.lease.core.MaterializeReport.Action;
 import network.ike.lease.core.Materializer;
 import network.ike.lease.core.OriginManifest;
 import network.ike.lease.core.ProcessGitRunner;
+import network.ike.lease.core.RefAligner;
+import network.ike.lease.core.RepoStamp;
 import network.ike.lease.core.WorkingSetName;
 
 /**
@@ -59,9 +61,25 @@ final class MaterializeOnOpen {
                     ProgressIndicator indicator) {
         indicator.setText("Materializing git state: " + workingSet);
         Materializer materializer = materializer(lease, indicator);
+        WorkingSetName name = new WorkingSetName(workingSet);
+        // The stamps are read before anything else runs: the acquisition
+        // just carried the previous holder's stamps forward, and the
+        // watcher's next renewal will overwrite them with this machine's
+        // own refs (ike-issues#1069) — so the alignment target is captured
+        // now, not re-read later.
+        List<RepoStamp> stamps = name.isSibling() ? List.of()
+                : RefAligner.recordedStamps(lease.root(), workingSet);
         MaterializeReport report;
+        RefAligner.AlignReport alignment = null;
         try {
-            report = materializer.materialize(new WorkingSetName(workingSet));
+            report = materializer.materialize(name);
+            if (!name.isSibling() && !stamps.isEmpty()) {
+                indicator.setText("Aligning refs to the holder's stamps: "
+                        + workingSet);
+                alignment = new RefAligner(lease.root(),
+                        new ProcessGitRunner(), indicator::setText2)
+                        .align(name, stamps);
+            }
         } catch (RuntimeException e) {
             // Materialization is an accessory to opening the project, so a
             // failure informs rather than blocks: the lease is held either
@@ -71,8 +89,14 @@ final class MaterializeOnOpen {
                             workingSet + ": " + e.getMessage()));
             return;
         }
+        RefAligner.AlignReport aligned = alignment;
         ApplicationManager.getApplication().invokeLater(
-                () -> present(project, lease, workingSet, report));
+                () -> {
+                    present(project, lease, workingSet, report);
+                    if (aligned != null) {
+                        presentAlignment(project, lease, workingSet, aligned);
+                    }
+                });
     }
 
     /**
@@ -132,6 +156,38 @@ final class MaterializeOnOpen {
                     NotificationAction.createSimple("Repair to local origins",
                             () -> repairInBackground(project, lease,
                                     workingSet)));
+        }
+    }
+
+    /**
+     * Balloon-facing alignment outcome (ike-issues#1069): one info line
+     * when refs moved, one capped warning when anything was refused —
+     * divergence stays a human decision, so the balloon names it and
+     * stops.
+     */
+    private static void presentAlignment(Project project, LeaseCli lease,
+                                         String workingSet,
+                                         RefAligner.AlignReport alignment) {
+        long moved = alignment.count(RefAligner.Status.MOVED)
+                + alignment.count(RefAligner.Status.SWITCHED_BRANCH);
+        List<RefAligner.Entry> refused = alignment.entries().stream()
+                .filter(entry -> entry.status()
+                                == RefAligner.Status.DIVERGED_REFUSED
+                        || entry.status() == RefAligner.Status.REFUSED)
+                .toList();
+        if (moved > 0) {
+            LeaseNotifier.info(project, "Refs aligned",
+                    workingSet + ": " + moved + (moved == 1
+                            ? " repository moved" : " repositories moved")
+                            + " to the holder's stamps — tree untouched.");
+            refreshVcsView(project, lease, workingSet);
+        }
+        if (!refused.isEmpty()) {
+            LeaseNotifier.warn(project, "Ref alignment incomplete",
+                    capped(refused.stream()
+                            .map(entry -> memberName(entry.path(), workingSet)
+                                    + ": " + escape(entry.detail()))
+                            .toList(), "<br/>"));
         }
     }
 
