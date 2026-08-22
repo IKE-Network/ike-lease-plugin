@@ -164,6 +164,15 @@ public final class LeaseCli {
     }
 
     /**
+     * Returns the synchronized development folder this bridge is rooted at.
+     *
+     * @return the {@code ike-dev} root
+     */
+    public Path root() {
+        return ikeDev;
+    }
+
+    /**
      * Returns this machine's stable identity.
      *
      * @return the captured machine id, or {@code "unknown"} when unreadable

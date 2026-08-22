@@ -363,13 +363,71 @@ public final class Materializer {
     }
 
     /**
+     * Re-points a sibling's legacy remote-remote origins to the local
+     * parent member paths — the migration recipe IKE-Network/ike-issues#992
+     * left open, run per member. Members already on a local origin are
+     * left untouched and reported as such; bare members are reported, not
+     * materialized (that is {@link #materialize}'s job).
+     *
+     * @param name the sibling working-set directory name
+     * @return the per-repository outcomes
+     */
+    public MaterializeReport repair(WorkingSetName name) {
+        List<Entry> entries = new ArrayList<>();
+        Path siblingDir = ikeDev.resolve(name.value());
+        if (!name.isSibling()) {
+            entries.add(new Entry(name.value(), Action.REFUSED,
+                    "repair applies to siblings; a root's origin comes from "
+                            + OriginManifest.RELATIVE_PATH));
+            return new MaterializeReport(name, entries);
+        }
+        Path parentDir = ikeDev.resolve(name.parent().value());
+        if (!Files.isDirectory(siblingDir) || !Files.isDirectory(parentDir)
+                || !hasGit(parentDir)) {
+            entries.add(new Entry(name.value(), Action.REFUSED,
+                    "sibling and a materialized parent must both be on disk"));
+            return new MaterializeReport(name, entries);
+        }
+        for (String member : discoverMembers(parentDir)) {
+            Path memberDir = resolveMember(siblingDir, member);
+            String reportPath = reportPath(name.value(), member);
+            if (!Files.isDirectory(memberDir)) {
+                entries.add(new Entry(reportPath, Action.NO_TREE, ""));
+                continue;
+            }
+            if (!hasGit(memberDir)) {
+                entries.add(new Entry(reportPath, Action.NO_GIT,
+                        "materialize creates git state; repair only re-points"
+                                + " origins"));
+                continue;
+            }
+            Entry current = originInvariantEntry(reportPath, memberDir);
+            if (current.action() != Action.REMOTE_ORIGIN_LEGACY) {
+                entries.add(current);
+                continue;
+            }
+            String parentPath = resolveMember(parentDir, member)
+                    .toAbsolutePath().normalize().toString();
+            GitResult set = git.run(memberDir,
+                    List.of("remote", "set-url", "origin", parentPath));
+            entries.add(set.ok()
+                    ? new Entry(reportPath, Action.REPAIRED,
+                            "origin re-pointed to " + parentPath)
+                    : new Entry(reportPath, Action.REFUSED,
+                            "git remote set-url failed: "
+                                    + set.stderr().strip()));
+        }
+        return new MaterializeReport(name, entries);
+    }
+
+    /**
      * Classifies a git origin as a local filesystem path or a remote URL.
      *
      * @param origin the configured origin
      * @return {@code true} for filesystem paths ({@code file://} included),
      *         {@code false} for scheme and scp-style remote URLs
      */
-    static boolean isLocalPath(String origin) {
+    public static boolean isLocalPath(String origin) {
         if (origin.startsWith("file://")) {
             return true;
         }

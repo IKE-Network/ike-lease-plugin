@@ -82,6 +82,16 @@ public final class LeaseProjectListener implements ProjectManagerListener {
                 indicator.setIndeterminate(true);
                 indicator.setText("Waiting for the sync layer to settle…");
                 boolean held = lease.ensureConfirmed(workingSet);
+                if (held) {
+                    // The open gesture is also the materialization gesture
+                    // (ike-issues#1057): a working set whose tree arrived
+                    // by sync gains its machine-local git state here, in
+                    // the same background task, after the lease is
+                    // confirmed. Idempotent — a materialized working set
+                    // reports and does nothing.
+                    MaterializeOnOpen.run(project, lease, workingSet,
+                            indicator);
+                }
                 ApplicationManager.getApplication().invokeLater(() -> {
                     if (held) {
                         LeaseNotifier.info(project, "Lease acquired",
@@ -142,6 +152,7 @@ public final class LeaseProjectListener implements ProjectManagerListener {
             LeaseNotifier.info(project, "Lease taken over",
                     workingSet + " is now held by " + lease.machineId()
                             + ". The other machine will save and close it.");
+            MaterializeOnOpen.runInBackground(project, lease, workingSet);
             return;
         }
         // Declined, or the takeover write failed. Either way this machine
@@ -191,6 +202,17 @@ public final class LeaseProjectListener implements ProjectManagerListener {
                     .getNotificationGroup("IKE Working-Set Leases")
                     .createNotification(title, content, type)
                     .notify(project);
+        }
+
+        static void notification(Project project, String title, String content,
+                                 NotificationType type,
+                                 com.intellij.notification.NotificationAction action) {
+            com.intellij.notification.Notification notification =
+                    NotificationGroupManager.getInstance()
+                            .getNotificationGroup("IKE Working-Set Leases")
+                            .createNotification(title, content, type);
+            notification.addAction(action);
+            notification.notify(project);
         }
     }
 }

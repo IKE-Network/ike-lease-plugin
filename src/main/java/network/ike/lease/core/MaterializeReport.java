@@ -27,6 +27,8 @@ public record MaterializeReport(WorkingSetName workingSet,
         /** A sibling repository still carrying a remote-remote origin —
          *  the pre-IKE-Network/ike-issues#992 shape, awaiting migration. */
         REMOTE_ORIGIN_LEGACY,
+        /** A legacy origin re-pointed to the local parent member path. */
+        REPAIRED,
         /** The operation could not proceed for this repository. */
         REFUSED
     }

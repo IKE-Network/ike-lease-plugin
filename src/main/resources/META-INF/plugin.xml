@@ -19,10 +19,17 @@
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
+    <!-- The sibling local-origin guard reads git push targets
+         (GitPushTarget → GitRemote), so the git plugin's classes must be
+         visible to this plugin's classloader. -->
+    <depends>Git4Idea</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <notificationGroup id="IKE Working-Set Leases"
                            displayType="BALLOON"/>
+        <!-- Refuses pushes from a sibling working set to anything but its
+             local parent (ike-issues#992, #1057). -->
+        <prePushHandler implementation="network.ike.lease.SiblingPrePushGuard"/>
     </extensions>
 
     <applicationListeners>

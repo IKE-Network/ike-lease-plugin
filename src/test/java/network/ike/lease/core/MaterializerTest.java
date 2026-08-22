@@ -238,6 +238,41 @@ class MaterializerTest {
     }
 
     @Test
+    void repairRepointsLegacyOriginsToTheLocalParent() throws IOException {
+        Path ikeDev = ikeDev();
+        Path parent = upstreamRepo("ike-dev/parent-ws", "main");
+        Path sibling = ikeDev.resolve("parent-ws꞉feat");
+        copyTree(parent, sibling);
+        Materializer materializer = materializer(ikeDev, "");
+        materializer.materialize(new WorkingSetName("parent-ws꞉feat"));
+        run(sibling, "remote", "set-url", "origin",
+                "git@github.com:IKE-Network/parent-ws.git");
+
+        MaterializeReport report = materializer.repair(
+                new WorkingSetName("parent-ws꞉feat"));
+
+        assertTrue(report.ok(), report.entries().toString());
+        assertEquals(1, report.count(Action.REPAIRED));
+        assertEquals(parent.toAbsolutePath().normalize().toString(),
+                originUrl(sibling));
+        assertEquals(1, materializer.repair(new WorkingSetName("parent-ws꞉feat"))
+                        .count(Action.LOCAL_ORIGIN_OK),
+                "a second repair finds nothing left to re-point");
+    }
+
+    @Test
+    void repairOnARootIsRefused() throws IOException {
+        Path ikeDev = ikeDev();
+        Files.createDirectories(ikeDev.resolve("some-root"));
+
+        MaterializeReport report = materializer(ikeDev, "")
+                .repair(new WorkingSetName("some-root"));
+
+        assertFalse(report.ok());
+        assertTrue(report.entries().getFirst().detail().contains("siblings"));
+    }
+
+    @Test
     void localPathClassificationCoversEveryOriginShape() {
         assertTrue(Materializer.isLocalPath("/Users/kec/ike-dev/ws"));
         assertTrue(Materializer.isLocalPath("../parent-ws"));

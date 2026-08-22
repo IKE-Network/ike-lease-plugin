@@ -29,8 +29,8 @@ public final class MaterializeCli {
     /**
      * Entry point.
      *
-     * @param args {@code materialize <working-set>} or
-     *             {@code verify <working-set>}, optionally followed by
+     * @param args {@code materialize}, {@code verify}, or {@code repair},
+     *             each followed by {@code <working-set>}, optionally with
      *             {@code --ike-dev <path>} to override the development
      *             folder (default: the {@code IKE_DEV} environment
      *             variable, else {@code ~/ike-dev})
@@ -61,7 +61,7 @@ public final class MaterializeCli {
             }
         }
         if (positional.size() != 2) {
-            return usage("expected: materialize|verify <working-set>");
+            return usage("expected: materialize|verify|repair <working-set>");
         }
         if (ikeDev == null) {
             ikeDev = ikeDevEnv != null && !ikeDevEnv.isBlank()
@@ -83,6 +83,7 @@ public final class MaterializeCli {
         MaterializeReport report = switch (command) {
             case "materialize" -> materializer.materialize(name);
             case "verify" -> materializer.verify(name);
+            case "repair" -> materializer.repair(name);
             default -> null;
         };
         if (report == null) {
@@ -96,7 +97,7 @@ public final class MaterializeCli {
 
     private static int usage(String problem) {
         System.out.println("materialize: " + problem);
-        System.out.println("usage: materialize|verify <working-set> "
+        System.out.println("usage: materialize|verify|repair <working-set> "
                 + "[--ike-dev <path>]");
         return 2;
     }

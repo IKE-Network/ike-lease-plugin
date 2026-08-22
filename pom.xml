@@ -126,6 +126,46 @@
             <version>${idea.build}</version>
             <scope>provided</scope>
         </dependency>
+        <!-- ProjectLevelVcsManager, VcsDirectoryMapping — making the IDE
+             notice freshly materialized git state (ike-issues#1057). -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>vcs</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- Repository, PushTarget/PushSpec/PushSource -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>vcs-dvcs</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- PrePushHandler, PushInfo — the sibling local-origin guard's
+             extension point lives in the dvcs implementation module. -->
+        <dependency>
+            <groupId>${idea.groupId}</groupId>
+            <artifactId>vcs-dvcs-impl</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- git4idea is published under the module-name mapping
+             intellij.vcs.git → com.jetbrains.intellij.vcs. The `git`
+             artifact itself is a descriptor stub; the classes are in the
+             split modules: GitPushTarget/GitRemoteBranch in git-backend,
+             GitRemote in git-shared. -->
+        <dependency>
+            <groupId>com.jetbrains.intellij.vcs</groupId>
+            <artifactId>git-backend</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.jetbrains.intellij.vcs</groupId>
+            <artifactId>git-shared</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
         <!-- org.jetbrains.annotations, on platform API signatures throughout.
              The real thing from Central, not the copy the IDE ships. -->
         <dependency>
