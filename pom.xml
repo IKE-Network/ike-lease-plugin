@@ -27,6 +27,17 @@
         goals can consume), and the IntelliJ enforcement plugin that hosts
         it at the open gesture. Split per IKE-Network/ike-issues#1067.
     </description>
+    <url>https://ike.network/ike-lease-plugin/</url>
+
+    <!-- The reactor artifactId (ike-lease) and the repository name
+         (ike-lease-plugin) deliberately differ; the org-site
+         registration reads this scm url to link and label the project
+         by its repository (ike-issues#1074). -->
+    <scm>
+        <url>https://github.com/IKE-Network/ike-lease-plugin</url>
+        <connection>scm:git:https://github.com/IKE-Network/ike-lease-plugin.git</connection>
+        <developerConnection>scm:git:git@github.com:IKE-Network/ike-lease-plugin.git</developerConnection>
+    </scm>
 
     <modules>
         <module>ike-lease-core</module>
