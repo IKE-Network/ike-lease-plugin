@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<site xmlns="http://maven.apache.org/SITE/2.0.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://maven.apache.org/SITE/2.0.0
+      https://maven.apache.org/xsd/site-2.0.0.xsd"
+      name="IKE Working-Set Leases">
+
+    <skin>
+        <groupId>org.sentrysoftware.maven</groupId>
+        <artifactId>sentry-maven-skin</artifactId>
+        <version>7.0.00</version>
+    </skin>
+
+    <custom>
+        <bodyClass>sentry-green</bodyClass>
+        <checkImageLinks>false</checkImageLinks>
+        <keywords>IKE Network, working-set lease, single writer, epoch fencing,
+                   materialization, ref alignment, Syncthing, IntelliJ plugin</keywords>
+    </custom>
+
+    <bannerLeft name="IKE Working-Set Leases" href="https://ike.network/"/>
+
+    <bannerRight name="GitHub &lt;i class='fa-brands fa-github'&gt;&lt;/i&gt;"
+        href="https://github.com/IKE-Network/ike-lease-plugin"/>
+
+    <publishDate format="yyyy-MM-dd"/>
+
+    <body>
+        <breadcrumbs>
+            <item name="IKE" href="https://ike.network/"/>
+            <item name="IKE Working-Set Leases" href="index.html"/>
+        </breadcrumbs>
+        <menu name="Documentation">
+            <item name="Overview" href="index.html"/>
+        </menu>
+        <menu name="Reports" ref="reports"/>
+    </body>
+</site>
