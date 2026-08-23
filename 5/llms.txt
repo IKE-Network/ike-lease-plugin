@@ -1,0 +1,25 @@
+# IKE Working-Set Leases
+
+> Single-writer working-set leases across Syncthing-paired machines:
+> the protocol and materializer core (a plain-Java library the ws:
+> goals can consume), and the IntelliJ enforcement plugin that hosts
+> it at the open gesture. Split per IKE-Network/ike-issues#1067.
+
+## Documentation
+
+- [IKE Working-Set Leases](https://ike.network/ike-base-parent/ike-lease/index.html.md)
+
+## Reports
+
+- [Project Dependencies](https://ike.network/ike-base-parent/ike-lease/dependencies.html.md)
+- [Reactor Dependency Convergence](https://ike.network/ike-base-parent/ike-lease/dependency-convergence.html.md)
+- [Maven Coordinates](https://ike.network/ike-base-parent/ike-lease/dependency-info.html.md)
+- [Project Distribution Management](https://ike.network/ike-base-parent/ike-lease/distribution-management.html.md)
+- [Project Licenses](https://ike.network/ike-base-parent/ike-lease/licenses.html.md)
+- [Project Modules](https://ike.network/ike-base-parent/ike-lease/modules.html.md)
+- [Project Plugin Management](https://ike.network/ike-base-parent/ike-lease/plugin-management.html.md)
+- [Project Plugins](https://ike.network/ike-base-parent/ike-lease/plugins.html.md)
+- [Source Code Management](https://ike.network/ike-base-parent/ike-lease/scm.html.md)
+- [Project Summary](https://ike.network/ike-base-parent/ike-lease/summary.html.md)
+- [Project Team](https://ike.network/ike-base-parent/ike-lease/team.html.md)
+- [Project Information](https://ike.network/ike-base-parent/ike-lease/project-info.html.md)

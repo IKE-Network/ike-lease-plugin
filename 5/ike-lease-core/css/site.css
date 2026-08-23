@@ -1,0 +1,169 @@
+/*
+ * IKE — Sentry Maven Skin Customization (Forest theme)
+ * =====================================================
+ * Canonical site.css for ike.network properties — distributed via
+ * network.ike.tooling:ike-build-standards (classifier=site-theme)
+ * and unpacked into each consumer's site at pre-site phase by
+ * ike-parent. Edits here propagate to every inheriting project on
+ * the next ike-tooling + ike-platform release.
+ * (See IKE-Network/ike-issues#318.)
+ *
+ * Hosted in ike-tooling rather than ike-doc-resources because
+ * ike-tooling itself needs site.css (#308) and cannot depend on
+ * ike-docs without inverting the release cascade.
+ *
+ * knowledge.design properties use the Horizon/purple theme and
+ * carry their own site.css; they do not consume this artifact.
+ *
+ * Derived from Gretel design system (Forest sub-palette):
+ *   Twilight (primary dark):    #273B36
+ *   Verdant (chrome / large):   #4A7D84
+ *   Verdant-deep (link AA):     #3A6065
+ *   Mist (gentle accent):       #B7E4D2
+ *   Cloud (off-white neutral):  #E6EBE7
+ *   Ember (warm highlight):     #FFA351
+ *   Waves (calming blue):       #A8C8FF
+ *   White:                      #ffffff
+ *
+ * Contrast notes (WCAG AA on white = 4.5:1 body, 3:1 large/UI):
+ *   Twilight   #273B36  ~12:1   body fg, banner bg
+ *   Verdant    #4A7D84  ~4.2:1  UI chrome only (fails AA for body)
+ *   Verdant-D  #3A6065  ~5.5:1  body links
+ *   Ember      #FFA351  ~2.6:1  highlight only (fails AA for body)
+ *
+ * Theme rationale: see brand-css-mappings topic in ike-lab-documents.
+ */
+
+/* ── Light Mode ─────────────────────────────────────── */
+/*
+ * Sentry skin defines `body.sentry-green` (and other body.sentry-*
+ * classes) with its own --banner-bgcolor / --alternate-* values. To
+ * win on CSS specificity we match the same selector here. The site
+ * descriptors (site.xml) use bodyClass=sentry-green so this block
+ * activates. Plain `body { ... }` would lose to Sentry's class block
+ * for the variables Sentry sets. (ike-issues#307)
+ */
+body,
+body.sentry-green {
+    /* Banner / Header — Verdant lifts the visual weight off Twilight
+       (which now serves only as body fg). White on Verdant tests at
+       4.66:1, just over WCAG AA for body text and well over 3:1 for
+       large/UI banner text. */
+    --banner-bgcolor: #4A7D84;        /* Verdant — growth, renewal */
+    --banner-fgcolor: #ffffff;
+
+    /* Page body */
+    --main-bgcolor: #ffffff;
+    --main-fgcolor: #273B36;          /* Twilight — high-contrast body text */
+
+    /* Accent areas (callout boxes, alternate rows, etc.) */
+    --alternate-bgcolor: #E6EBE7;     /* Cloud — soft off-white */
+    --alternate-fgcolor: #273B36;
+
+    /* Links — deepened Verdant clears WCAG AA on white */
+    --link-color: #3A6065;
+
+    /* Status colors — Forest-tinted */
+    --success-bg: #d6e9c6;
+    --success-fg: #32661c;
+    --info-bg: #B7E4D2;              /* Mist — mint-tinted info instead of default cyan */
+    --info-fg: #273B36;
+    --warning-bg: #faebcc;
+    --warning-fg: #7f6c08;
+    --danger-bg: #ebccd1;
+    --danger-fg: #680c0c;
+
+    /* Ember as warm highlight — used for hover/active states by skin */
+    --accent-color: #FFA351;
+}
+
+/* ── Dark Mode ──────────────────────────────────────── */
+/*
+ * Same specificity-winning pattern: Sentry's body.sentry-green.dark
+ * (or just body.dark with the class) needs us to match. We list both
+ * forms to cover whichever Sentry uses for the dark toggle.
+ */
+body.dark,
+body.sentry-green.dark {
+    --main-bgcolor: #273B36;          /* Twilight (matches banner) */
+    --main-fgcolor: #E6EBE7;          /* Cloud — soft off-white */
+    --alternate-bgcolor: #1D2D29;     /* Slightly darker Twilight for panels */
+    --alternate-fgcolor: #E6EBE7;
+
+    --link-color: #B7E4D2;            /* Mist — ~9:1 on Twilight */
+
+    --info-bg: #1D2D29;
+    --info-fg: #B7E4D2;
+    --success-bg: #32661c;
+    --success-fg: #d6e9c6;
+    --warning-bg: #7f6c08;
+    --warning-fg: #faebcc;
+    --danger-bg: #680c0c;
+    --danger-fg: #ebccd1;
+
+    --accent-color: #FFA351;
+}
+
+/* ── Inline <code> ──────────────────────────────────── */
+/*
+ * Sentry sets `body.sentry-site :not(pre)>code { color: var(--main-fgcolor) }`
+ * at (0,1,3). In dark mode that resolves to Cloud — fine on the Twilight
+ * body bg, but invisible inside AsciiDoc-rendered bodyTable cells which
+ * carry a hardcoded `style="background: #FFFFFF"`.
+ *
+ * Two body rules at (0,3,3) per mode, plus one narrower override at
+ * (0,4,3) for AsciiDoc tables — those carry the inline white bg which
+ * we detect via [style*="background"]. Project-info-reports tables
+ * also use class="bodyTable" but DO NOT have the inline bg, so we
+ * leave them alone and let inheritance walk up to .main-content's
+ * --main-fgcolor (Cloud in dark mode, Twilight in light).
+ */
+body.sentry-site:not(.dark) :not(pre) > code {
+    color: #273B36;                     /* Twilight on light-mode bg */
+}
+body.dark.sentry-site :not(pre) > code {
+    color: #B7E4D2;                     /* Mist on dark-mode bg */
+}
+body.sentry-site .table.bodyTable[style*="background"] :not(pre) > code {
+    color: #273B36;                     /* Twilight inside white-bg AsciiDoc tables */
+}
+
+/* ── Tables ─────────────────────────────────────────── */
+/*
+ * Two table flavors carry class="bodyTable":
+ *
+ *   1. AsciiDoc-rendered tables (asciidoctor-parser-doxia-module)
+ *      get an inline `style="background: #FFFFFF"` regardless of
+ *      theme. In dark mode their cells are white-on-Twilight-body.
+ *      Without an override, Sentry's color:inherit walks up to
+ *      .main-content -> --main-fgcolor = Cloud, giving Cloud on
+ *      white at ~1.4:1 — invisible.
+ *
+ *   2. Project-info-reports tables (auto-generated by
+ *      maven-project-info-reports-plugin) carry the same bodyTable
+ *      class but NO inline bg. Their cells are transparent over the
+ *      body bg. Sentry's color:inherit gives Cloud on Twilight in
+ *      dark mode — readable. We must NOT override these.
+ *
+ * Override scope: only tables with the inline white background.
+ * (0,4,5) beats Sentry's `body.sentry-site .table > tbody > tr > td`
+ * at (0,2,4).
+ */
+body.dark.sentry-site .table.bodyTable[style*="background"] > thead > tr > th,
+body.dark.sentry-site .table.bodyTable[style*="background"] > tbody > tr > th,
+body.dark.sentry-site .table.bodyTable[style*="background"] > tbody > tr > td,
+body.dark.sentry-site .table.bodyTable[style*="background"] > tfoot > tr > th,
+body.dark.sentry-site .table.bodyTable[style*="background"] > tfoot > tr > td {
+    color: #273B36;                     /* Twilight on white inline-bg */
+}
+
+/* ── Fonts ──────────────────────────────────────────── */
+/* The brand guide uses Gretel's custom fonts. For web,
+   approximate with clean geometric sans-serif families.
+   Swap these if IKE specifies exact font names later. */
+:root {
+    --title-font: "Inter", "Helvetica Neue", sans-serif;
+    --heading-font: "Inter", "Helvetica Neue", sans-serif;
+    --content-font: "Inter", "Roboto", sans-serif;
+    --content-font-size: 15px;
+}

@@ -1,0 +1,23 @@
+# 
+
+> The lease protocol (the exact port of lease.sh v2, golden-tested
+> against a frozen reference) and the git-state materializer, as a
+> plain-Java JPMS library with no IDE dependency — one core, thin
+> hosts (IKE-Network/ike-issues#1057, #1067). The IntelliJ plugin
+> embeds it; lease.sh execs its CLIs; the ws: goals may depend on it
+> directly, which is what retires the goal-to-$HOME-script coupling
+> (IKE-Network/ike-issues#1005).
+
+## Other
+
+- [Project Dependencies](https://ike.network/ike-base-parent/ike-lease/ike-lease-core/dependencies.html.md)
+- [Maven Coordinates](https://ike.network/ike-base-parent/ike-lease/ike-lease-core/dependency-info.html.md)
+- [Project Distribution Management](https://ike.network/ike-base-parent/ike-lease/ike-lease-core/distribution-management.html.md)
+- [About](https://ike.network/ike-base-parent/ike-lease/ike-lease-core/index.html.md)
+- [Project Licenses](https://ike.network/ike-base-parent/ike-lease/ike-lease-core/licenses.html.md)
+- [Project Plugin Management](https://ike.network/ike-base-parent/ike-lease/ike-lease-core/plugin-management.html.md)
+- [Project Plugins](https://ike.network/ike-base-parent/ike-lease/ike-lease-core/plugins.html.md)
+- [Source Code Management](https://ike.network/ike-base-parent/ike-lease/ike-lease-core/scm.html.md)
+- [Project Summary](https://ike.network/ike-base-parent/ike-lease/ike-lease-core/summary.html.md)
+- [Project Team](https://ike.network/ike-base-parent/ike-lease/ike-lease-core/team.html.md)
+- [Project Information](https://ike.network/ike-base-parent/ike-lease/ike-lease-core/project-info.html.md)

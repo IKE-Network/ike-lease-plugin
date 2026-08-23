@@ -1,0 +1,21 @@
+# 
+
+> The IDE host of the lease core: opening a project acquires its
+> lease and materializes its git state; being fenced by a takeover
+> elsewhere saves open documents and closes the project; sibling
+> pushes to remote remotes abort in the push dialog. Ships as a zip
+> bundling this jar and ike-lease-core under lib/.
+
+## Other
+
+- [Project Dependencies](https://ike.network/ike-base-parent/ike-lease/ike-lease-plugin/dependencies.html.md)
+- [Maven Coordinates](https://ike.network/ike-base-parent/ike-lease/ike-lease-plugin/dependency-info.html.md)
+- [Project Distribution Management](https://ike.network/ike-base-parent/ike-lease/ike-lease-plugin/distribution-management.html.md)
+- [About](https://ike.network/ike-base-parent/ike-lease/ike-lease-plugin/index.html.md)
+- [Project Licenses](https://ike.network/ike-base-parent/ike-lease/ike-lease-plugin/licenses.html.md)
+- [Project Plugin Management](https://ike.network/ike-base-parent/ike-lease/ike-lease-plugin/plugin-management.html.md)
+- [Project Plugins](https://ike.network/ike-base-parent/ike-lease/ike-lease-plugin/plugins.html.md)
+- [Source Code Management](https://ike.network/ike-base-parent/ike-lease/ike-lease-plugin/scm.html.md)
+- [Project Summary](https://ike.network/ike-base-parent/ike-lease/ike-lease-plugin/summary.html.md)
+- [Project Team](https://ike.network/ike-base-parent/ike-lease/ike-lease-plugin/team.html.md)
+- [Project Information](https://ike.network/ike-base-parent/ike-lease/ike-lease-plugin/project-info.html.md)
