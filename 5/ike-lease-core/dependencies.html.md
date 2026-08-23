@@ -1,7 +1,7 @@
 ---
 date_published: 1980-01-31
 date_modified: 1980-01-31
-canonical_url: https://ike.network/ike-base-parent/ike-lease/ike-lease-core/dependencies.html
+canonical_url: https://ike.network/ike-lease-plugin/ike-lease-core/dependencies.html
 ---
 
 # Project Dependencies
@@ -48,7 +48,7 @@ The following is a list of test dependencies for this project. These dependencie
   
   | IKE Working-Set Leases — Core |
   | --- |
-  | **Description: **The lease protocol (the exact port of lease.sh v2, golden-tested against a frozen reference) and the git-state materializer, as a plain-Java JPMS library with no IDE dependency — one core, thin hosts (IKE-Network/ike-issues#1057, #1067). The IntelliJ plugin embeds it; lease.sh execs its CLIs; the ws: goals may depend on it directly, which is what retires the goal-to-$HOME-script coupling (IKE-Network/ike-issues#1005). **URL: **[https://ike.network/ike-base-parent/ike-lease/ike-lease-core/](https://ike.network/ike-base-parent/ike-lease/ike-lease-core/)[8] **Project Licenses: **[Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0.txt)[4] |
+  | **Description: **The lease protocol (the exact port of lease.sh v2, golden-tested against a frozen reference) and the git-state materializer, as a plain-Java JPMS library with no IDE dependency — one core, thin hosts (IKE-Network/ike-issues#1057, #1067). The IntelliJ plugin embeds it; lease.sh execs its CLIs; the ws: goals may depend on it directly, which is what retires the goal-to-$HOME-script coupling (IKE-Network/ike-issues#1005). **URL: **[https://ike.network/ike-lease-plugin/ike-lease-core/](https://ike.network/ike-lease-plugin/ike-lease-core/)[8] **Project Licenses: **[Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0.txt)[4] |
   
     - org.junit.jupiter:junit-jupiter:jar:5.11.4 (test) ** 
       

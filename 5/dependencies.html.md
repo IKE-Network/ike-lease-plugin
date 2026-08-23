@@ -1,7 +1,7 @@
 ---
 date_published: 1980-01-31
 date_modified: 1980-01-31
-canonical_url: https://ike.network/ike-base-parent/ike-lease/dependencies.html
+canonical_url: https://ike.network/ike-lease-plugin/dependencies.html
 ---
 
 # Project Dependencies
@@ -26,7 +26,7 @@ No transitive dependencies are required for this project.
   
   | IKE Working-Set Leases |
   | --- |
-  | **Description: **Single-writer working-set leases across Syncthing-paired machines: the protocol and materializer core (a plain-Java library the ws: goals can consume), and the IntelliJ enforcement plugin that hosts it at the open gesture. Split per IKE-Network/ike-issues#1067. **URL: **[https://ike.network/ike-base-parent/ike-lease/](https://ike.network/ike-base-parent/ike-lease/)[3] **Project Licenses: **[Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0.txt)[2] |
+  | **Description: **Single-writer working-set leases across Syncthing-paired machines: the protocol and materializer core (a plain-Java library the ws: goals can consume), and the IntelliJ enforcement plugin that hosts it at the open gesture. Split per IKE-Network/ike-issues#1067. **URL: **[https://ike.network/ike-lease-plugin/](https://ike.network/ike-lease-plugin/)[3] **Project Licenses: **[Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0.txt)[2] |
   
     - network.ike:ike-base-parent:zip:site-theme:15 (provided) ** 
       

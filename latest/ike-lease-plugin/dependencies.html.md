@@ -1,7 +1,7 @@
 ---
 date_published: 1980-01-31
 date_modified: 1980-01-31
-canonical_url: https://ike.network/ike-base-parent/ike-lease/ike-lease-plugin/dependencies.html
+canonical_url: https://ike.network/ike-lease-plugin/ike-lease-plugin/dependencies.html
 ---
 
 # Project Dependencies
@@ -12,7 +12,7 @@ The following is a list of compile dependencies for this project. These dependen
 
 | GroupId | ArtifactId | Version | Type | Licenses |
 | --- | --- | --- | --- | --- |
-| network.ike | [ike-lease-core](https://ike.network/ike-base-parent/ike-lease/ike-lease-core/)[1] | 6-SNAPSHOT | jar | [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0.txt)[2] |
+| network.ike | [ike-lease-core](https://ike.network/ike-lease-plugin/ike-lease-core/)[1] | 6-SNAPSHOT | jar | [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0.txt)[2] |
 
 ## [provided](#provided)
 
@@ -378,13 +378,13 @@ The following is a list of provided dependencies for this project. These depende
   
   | IKE Working-Set Leases — IntelliJ Plugin |
   | --- |
-  | **Description: **The IDE host of the lease core: opening a project acquires its lease and materializes its git state; being fenced by a takeover elsewhere saves open documents and closes the project; sibling pushes to remote remotes abort in the push dialog. Ships as a zip bundling this jar and ike-lease-core under lib/. **URL: **[https://ike.network/ike-base-parent/ike-lease/ike-lease-plugin/](https://ike.network/ike-base-parent/ike-lease/ike-lease-plugin/)[113] **Project Licenses: **[Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0.txt)[2] |
+  | **Description: **The IDE host of the lease core: opening a project acquires its lease and materializes its git state; being fenced by a takeover elsewhere saves open documents and closes the project; sibling pushes to remote remotes abort in the push dialog. Ships as a zip bundling this jar and ike-lease-core under lib/. **URL: **[https://ike.network/ike-lease-plugin/ike-lease-plugin/](https://ike.network/ike-lease-plugin/ike-lease-plugin/)[113] **Project Licenses: **[Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0.txt)[2] |
   
     - network.ike:ike-lease-core:jar:6-SNAPSHOT (compile) ** 
       
       | IKE Working-Set Leases — Core |
       | --- |
-      | **Description: **The lease protocol (the exact port of lease.sh v2, golden-tested against a frozen reference) and the git-state materializer, as a plain-Java JPMS library with no IDE dependency — one core, thin hosts (IKE-Network/ike-issues#1057, #1067). The IntelliJ plugin embeds it; lease.sh execs its CLIs; the ws: goals may depend on it directly, which is what retires the goal-to-$HOME-script coupling (IKE-Network/ike-issues#1005). **URL: **[https://ike.network/ike-base-parent/ike-lease/ike-lease-core/](https://ike.network/ike-base-parent/ike-lease/ike-lease-core/)[1] **Project Licenses: **[Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0.txt)[2] |
+      | **Description: **The lease protocol (the exact port of lease.sh v2, golden-tested against a frozen reference) and the git-state materializer, as a plain-Java JPMS library with no IDE dependency — one core, thin hosts (IKE-Network/ike-issues#1057, #1067). The IntelliJ plugin embeds it; lease.sh execs its CLIs; the ws: goals may depend on it directly, which is what retires the goal-to-$HOME-script coupling (IKE-Network/ike-issues#1005). **URL: **[https://ike.network/ike-lease-plugin/ike-lease-core/](https://ike.network/ike-lease-plugin/ike-lease-core/)[1] **Project Licenses: **[Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0.txt)[2] |
     - com.jetbrains.intellij.platform:core:jar:262.9437.185 (provided) ** 
       
       | com.jetbrains.intellij.platform:core |

@@ -1,7 +1,7 @@
 ---
 date_published: 1980-01-31
 date_modified: 1980-01-31
-canonical_url: https://ike.network/ike-base-parent/ike-lease/ike-lease-plugin/distribution-management.html
+canonical_url: https://ike.network/ike-lease-plugin/ike-lease-plugin/distribution-management.html
 ---
 
 # Overview

@@ -1,14 +1,14 @@
 ---
 date_published: 1980-01-31
 date_modified: 1980-01-31
-canonical_url: https://ike.network/ike-base-parent/ike-lease/ike-lease-core/plugins.html
+canonical_url: https://ike.network/ike-lease-plugin/ike-lease-core/plugins.html
 ---
 
 # Project Build Plugins
 
 | GroupId | ArtifactId | Version |
 | --- | --- | --- |
-| network.ike.tooling | [ike-maven-plugin](https://ike.network/ike-tooling/ike-maven-plugin/)[1] | 252 |
+| network.ike.tooling | [ike-maven-plugin](https://ike.network/ike-tooling/ike-maven-plugin/)[1] | 253 |
 | org.apache.maven.plugins | [maven-assembly-plugin](https://maven.apache.org/plugins/maven-assembly-plugin/)[2] | 3.7.1 |
 | org.apache.maven.plugins | [maven-clean-plugin](https://maven.apache.org/plugins/maven-clean-plugin/)[3] | 3.4.0 |
 | org.apache.maven.plugins | [maven-compiler-plugin](https://maven.apache.org/plugins/maven-compiler-plugin/)[4] | 3.13.0 |
