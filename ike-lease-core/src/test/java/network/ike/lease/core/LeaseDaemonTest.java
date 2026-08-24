@@ -143,6 +143,7 @@ class LeaseDaemonTest {
             return "";
         });
         Files.createDirectories(ikeDev.resolve("my-ws"));
+        record("my-ws", "held", ME, 3, stamp(10));   // live → in scope
 
         daemon.pass(false);     // first pass: lastProbe=0 → probes
         int afterFirst = probed.size();
@@ -151,6 +152,32 @@ class LeaseDaemonTest {
         assertTrue(afterFirst > 0, "the first pass probes");
         assertEquals(afterFirst, probed.size(),
                 "the second pass is inside the rate limit");
+    }
+
+    @Test
+    void probeScopeIsLiveHeldRecordsOnly() throws Exception {
+        List<String> probed = new ArrayList<>();
+        LeaseDaemon daemon = daemon(ws -> {
+            probed.add(ws);
+            return "";
+        });
+        // Four working sets on disk; only the actively held one is in
+        // the alarm's scope (ike-issues#1075).
+        for (String ws : java.util.List.of("active-ws", "idle-ws",
+                "done-ws", "unclaimed-ws")) {
+            Files.createDirectories(ikeDev.resolve(ws));
+        }
+        record("active-ws", "held", OTHER, 3, stamp(10));       // live
+        record("idle-ws", "held", ME, 5, stamp(3L * 3600));     // stale
+        record("done-ws", "released", ME, 2, stamp(10));        // released
+        // unclaimed-ws: no record at all
+
+        daemon.pass(true);
+
+        assertEquals(List.of("active-ws"), probed,
+                "renewal within the TTL is the activity signal; idle "
+                        + "claims, released records, and free trees are "
+                        + "not probed");
     }
 
     @Test

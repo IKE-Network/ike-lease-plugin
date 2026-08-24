@@ -564,7 +564,7 @@ public final class LeaseProtocol {
      * anything else 600 seconds. Preserved, not improved — the two
      * implementations must agree on every input.
      */
-    private static long ttlToSeconds(String ttl) {
+    static long ttlToSeconds(String ttl) {
         Matcher m = TTL.matcher(ttl == null ? "" : ttl);
         if (!m.matches()) {
             return 600L;

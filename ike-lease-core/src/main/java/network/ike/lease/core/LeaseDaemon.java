@@ -43,9 +43,13 @@ import java.util.function.Function;
  *       their staleness horizon, are collected.</li>
  *   <li><b>The non-participant alarm.</b> A lease is a claim, and only
  *       participants make claims; the open-project probe is the monitor
- *       for that control. Rate-limited, and notify-never-block — the
- *       probe rides SSH, and a denial that depends on reaching a peer
- *       would break the rule that correctness never does.</li>
+ *       for that control. Scoped to working sets whose lease is held
+ *       and renewed within its staleness horizon — renewal is the
+ *       activity signal, so probing follows actual work and stops when
+ *       the machine idles (IKE-Network/ike-issues#1075). Rate-limited,
+ *       and notify-never-block — the probe rides SSH, and a denial
+ *       that depends on reaching a peer would break the rule that
+ *       correctness never does.</li>
  * </ol>
  */
 public final class LeaseDaemon {
@@ -198,15 +202,26 @@ public final class LeaseDaemon {
     }
 
     /**
-     * The non-participant alarm: for every working set on disk, ask the
-     * probe who actually has it open and compare against the lease. An
-     * IDE holding a working set open on a machine that does not hold its
-     * lease is exactly what a claim-based protocol cannot see alone.
-     * Probe errors (a reachable peer whose check failed) are logged, not
+     * The non-participant alarm: for every <em>actively held</em>
+     * working set — lease state {@code held}, renewed within its own
+     * TTL, any holder — ask the probe who actually has it open and
+     * compare against the lease. An IDE holding a working set open on
+     * a machine that does not hold its lease is exactly what a
+     * claim-based protocol cannot see alone.
+     *
+     * <p>The freshness scope (IKE-Network/ike-issues#1075) is the
+     * protocol's own LIVE-versus-EXPIRED staleness test reused as the
+     * activity filter: the watcher and the fence renew only during
+     * real work, so a held-but-stale record is an idle claim on an
+     * idle tree — no live work for a rogue opener to collide with, and
+     * the next open gesture re-runs confirmed acquisition regardless.
+     * Probing therefore follows actual work: a handful of connections
+     * during active development, none when the fleet idles. Probe
+     * errors (a reachable peer whose check failed) are logged, not
      * alarmed — a flaky headless ssh must not cry wolf.
      */
     private void alarmProbe(String me) {
-        for (String ws : workingSetsOnDisk()) {
+        for (String ws : liveHeldWorkingSets()) {
             String output;
             try {
                 output = prober.apply(ws);
@@ -275,26 +290,29 @@ public final class LeaseDaemon {
         return names;
     }
 
-    private List<String> workingSetsOnDisk() {
+    /**
+     * Working sets whose lease record is held and renewed within its
+     * own TTL — the alarm's scope (IKE-Network/ike-issues#1075). An
+     * unparseable renewal stamp counts as live, mirroring the
+     * protocol's own safe-side staleness reading.
+     */
+    private List<String> liveHeldWorkingSets() {
         List<String> sets = new ArrayList<>();
-        LeaseProtocol protocol = new LeaseProtocol(ikeDev, home, ikeDev,
-                "PT10M", 0);
-        try (DirectoryStream<Path> stream =
-                Files.newDirectoryStream(ikeDev)) {
-            for (Path entry : stream) {
-                if (!Files.isDirectory(entry)) {
-                    continue;
-                }
-                LeaseProtocol.Outcome resolved =
-                        protocol.resolve(entry.toString());
-                if (resolved.exitCode() == 0) {
-                    sets.add(resolved.stdout().trim());
-                }
+        long now = Instant.now().getEpochSecond();
+        for (String ws : leaseRecordNames()) {
+            Optional<LeaseRecord> record = LeaseRecord.read(leaseFile(ws));
+            if (record.isEmpty()
+                    || !"held".equals(record.get().state())) {
+                continue;
             }
-        } catch (IOException e) {
-            log.add("could not list " + ikeDev + ": " + e.getMessage());
+            long ttl = LeaseProtocol.ttlToSeconds(record.get().ttl());
+            boolean live = renewedEpoch(record.get())
+                    .map(renewed -> now - renewed <= ttl)
+                    .orElse(true);
+            if (live) {
+                sets.add(ws);
+            }
         }
-        sets.sort(String::compareTo);
         return sets;
     }
 
