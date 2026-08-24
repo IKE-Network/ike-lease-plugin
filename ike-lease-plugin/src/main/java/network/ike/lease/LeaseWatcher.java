@@ -2,10 +2,12 @@ package network.ike.lease;
 
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.components.Service;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.startup.StartupManager;
 
 import java.io.IOException;
 import java.nio.file.FileSystems;
@@ -169,7 +171,17 @@ public final class LeaseWatcher implements Disposable {
         if (!STANDING_DOWN.add(project)) {
             return;                     // already queued for this project
         }
-        ApplicationManager.getApplication().invokeLater(() -> {
+        // Only ever close a FULLY OPENED project. A stand-down can be
+        // queued while the project is still initializing — declining the
+        // takeover dialog raised at the open gesture is exactly that case
+        // — and closing a half-initialized project cancels its container
+        // mid-startup and wedges the platform's action system: every
+        // menu population thereafter dies with
+        // MenuCancelledControlFlowException, IDE-wide, until restart
+        // (field-hit on 2026.2, ike-issues#1077). runAfterOpened runs
+        // immediately when the project is already open, so the watcher
+        // sweep and fenced paths are unchanged.
+        runWhenFullyOpened(project, () -> {
             try {
                 if (project.isDisposed()) {
                     return;
@@ -185,6 +197,23 @@ public final class LeaseWatcher implements Disposable {
                 STANDING_DOWN.remove(project);
             }
         });
+    }
+
+    /**
+     * Runs an action on the event dispatch thread at non-modal modality,
+     * no earlier than the project's startup completing. The one gate both
+     * consequential lease surfaces share: the takeover decision and the
+     * stand-down close both belong on a clean, fully-opened stack
+     * (ike-issues#1077). A project disposed before it finishes opening
+     * drops the action, which is the correct outcome for both.
+     *
+     * @param project the project whose startup gates the action
+     * @param action  what to run, on the EDT, non-modal
+     */
+    static void runWhenFullyOpened(Project project, Runnable action) {
+        StartupManager.getInstance(project).runAfterOpened(() ->
+                ApplicationManager.getApplication().invokeLater(action,
+                        ModalityState.nonModal()));
     }
 
     /** Stops the watcher thread. */

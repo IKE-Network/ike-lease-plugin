@@ -64,9 +64,12 @@ public final class LeaseProjectListener implements ProjectManagerListener {
 
         // Already held live elsewhere: there is nothing to confirm, and
         // making the operator wait out a settle window for an answer we
-        // already have would be pure delay. Go straight to the decision.
+        // already have would be pure delay. Go straight to the decision —
+        // but not before the project finishes opening: the dialog's
+        // decline path closes the project, and a close during startup
+        // wedges the IDE (ike-issues#1077).
         if (lease.status(workingSet) == LeaseState.LIVE) {
-            ApplicationManager.getApplication().invokeLater(
+            LeaseWatcher.runWhenFullyOpened(project,
                     () -> askToTakeOver(project, lease, workingSet, false));
             return;
         }
@@ -92,18 +95,21 @@ public final class LeaseProjectListener implements ProjectManagerListener {
                     MaterializeOnOpen.run(project, lease, workingSet,
                             indicator);
                 }
-                ApplicationManager.getApplication().invokeLater(() -> {
-                    if (held) {
-                        LeaseNotifier.info(project, "Lease acquired",
-                                workingSet + " is now held by " + lease.machineId() + ".");
-                    } else {
-                        // The claim was written and then lost: another
-                        // machine's acquisition landed inside the window.
-                        // Same decision as any live lease, different story,
-                        // so the operator is told which one happened.
-                        askToTakeOver(project, lease, workingSet, true);
-                    }
-                });
+                if (held) {
+                    ApplicationManager.getApplication().invokeLater(() ->
+                            LeaseNotifier.info(project, "Lease acquired",
+                                    workingSet + " is now held by "
+                                            + lease.machineId() + "."));
+                } else {
+                    // The claim was written and then lost: another
+                    // machine's acquisition landed inside the window.
+                    // Same decision as any live lease, different story,
+                    // so the operator is told which one happened — on the
+                    // same fully-opened gate as every takeover decision
+                    // (ike-issues#1077).
+                    LeaseWatcher.runWhenFullyOpened(project, () ->
+                            askToTakeOver(project, lease, workingSet, true));
+                }
             }
         });
     }
@@ -123,7 +129,11 @@ public final class LeaseProjectListener implements ProjectManagerListener {
      * write to, and staying open on it is exactly what the lease exists to
      * prevent. So the choice is honest now: take it over, or close.
      *
-     * <p>Must be called on the event dispatch thread.
+     * <p>Must be called on the event dispatch thread with the project
+     * fully opened — both callers route through
+     * {@link LeaseWatcher#runWhenFullyOpened}, because the decline path
+     * closes the project and a close during startup wedges the IDE
+     * (ike-issues#1077).
      *
      * @param project    the project whose working set is leased elsewhere
      * @param lease      the bridge to the lease protocol
@@ -134,6 +144,9 @@ public final class LeaseProjectListener implements ProjectManagerListener {
      */
     private static void askToTakeOver(Project project, LeaseCli lease,
                                       String workingSet, boolean lostRace) {
+        if (project.isDisposed()) {
+            return;     // closed while the decision waited its turn
+        }
         String detail = lease.describe(workingSet);
         String preamble = lostRace
                 ? "Another machine claimed this working set at the same moment, "
