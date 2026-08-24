@@ -60,7 +60,7 @@
         <dependency>
             <groupId>network.ike</groupId>
             <artifactId>ike-lease-core</artifactId>
-            <version>${project.version}</version>
+            <version>6</version>
         </dependency>
         <!-- Project, ApplicationManager, Service, FileDocumentManager,
              ProgressManager, Task, ProgressIndicator -->

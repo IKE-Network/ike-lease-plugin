@@ -17,7 +17,7 @@
          released root declares its group; now this one does too. -->
     <groupId>network.ike</groupId>
     <artifactId>ike-lease</artifactId>
-    <version>6-SNAPSHOT</version>
+    <version>6</version>
     <packaging>pom</packaging>
 
     <name>IKE Working-Set Leases</name>
@@ -65,7 +65,7 @@
              phase, which is where it earns its keep — the javadoc gate. -->
         <publishSite>false</publishSite>
         <!-- Not registered in the cascade. -->
-        <ike.skip.orgSite>true</ike.skip.orgSite>
+        <ike.skip.orgSite>true</ike.skip.orgSite><ike-tooling.version>${network.ike.tooling__GA__ike-tooling__VERSION}</ike-tooling.version>
     </properties>
 
     <build>
