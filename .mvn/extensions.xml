@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<extensions xmlns="http://maven.apache.org/EXTENSIONS/1.2.0"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            xsi:schemaLocation="http://maven.apache.org/EXTENSIONS/1.2.0
+                                https://maven.apache.org/xsd/core-extensions-1.2.0.xsd">
+
+    <!-- ike-version-management-extension: runs the typed-marker
+         convention on every build and injects the __ALIAS-driven
+         short-name indirections into the consumer POM at install and
+         deploy, so snapshot and release POMs carry them alike without
+         a release-time bake (IKE-Network/ike-issues#1094). The version
+         is a literal; Maven 4 does not interpolate this file. -->
+    <extension>
+        <groupId>network.ike.tooling</groupId>
+        <artifactId>ike-version-management-extension</artifactId>
+        <version>11</version>
+    </extension>
+
+</extensions>
