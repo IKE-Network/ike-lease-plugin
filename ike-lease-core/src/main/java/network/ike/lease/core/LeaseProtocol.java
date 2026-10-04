@@ -20,22 +20,33 @@ import java.util.regex.Pattern;
  * {@code lease.sh} v2 (IKE-Network/ike-issues#1067, design
  * {@code dev-working-set-lease}, tracked in IKE-Network/ike-issues#1002).
  *
- * <p><b>This is a port, not a redesign.</b> Verb for verb, message for
- * message, exit code for exit code, and byte for byte on disk, this class
- * reproduces what the shell implementation did: the golden equivalence
- * tests run both against identical fixtures and compare everything.
- * Behavior that looks quirky here — the crude TTL parser's 600-second
- * fallback, reconciliation running as a side effect of every read, the
- * {@code status} verb reconciling twice — is the shell's, preserved,
- * because a fencing system whose implementations disagree is worse than
- * one with no fencing at all. Improvements belong after the flip, made
- * once, here.
+ * <p><b>This began as a port, not a redesign.</b> Exit code for exit
+ * code and byte for byte on disk, this class reproduces what the shell
+ * implementation did: the golden equivalence tests run both against
+ * identical fixtures and compare everything. Behavior that looks quirky
+ * here — the crude TTL parser's 600-second fallback, reconciliation
+ * running as a side effect of every read, the {@code status} verb
+ * reconciling twice — is the shell's, preserved, because a fencing system
+ * whose implementations disagree is worse than one with no fencing at
+ * all. Improvements belong after the flip, made once, here.
  *
- * <p>States: {@code FREE} (no record, or explicitly released),
- * {@code MINE} (held by this machine), {@code EXPIRED} (held elsewhere
- * but not renewed within its ttl — reclaim silently), {@code LIVE} (held
- * elsewhere and fresh — takeover requires a human decision). The TTL is a
- * staleness horizon, never a wait.
+ * <p>The first such improvement is the vocabulary
+ * (IKE-Network/ike-issues#1215), modelled on a library loan: a machine
+ * <em>takes</em> a working set, <em>renews</em> it while working,
+ * <em>returns</em> it when done, and <em>recalls</em> one another machine
+ * holds live — the human's decision. The equivalence tests compare modulo
+ * exactly that vocabulary.
+ *
+ * <p>States: {@code FREE} (no record, or returned), {@code MINE} (held by
+ * this machine), {@code EXPIRED} (held elsewhere but not renewed within
+ * its ttl — taken silently), {@code LIVE} (held elsewhere and fresh —
+ * recalling it requires a human decision). The TTL is a staleness horizon,
+ * never a wait.
+ *
+ * <p>Siblings additionally carry their committed history in git bundles
+ * beside the record (IKE-Network/ike-issues#1216): renewing refreshes the
+ * bundles of members whose head moved, and returning writes them all, so
+ * the next machine can align its refs to commits it has never seen.
  */
 public final class LeaseProtocol {
 
@@ -60,6 +71,7 @@ public final class LeaseProtocol {
     private final Path workingDirectory;
     private final String defaultTtl;
     private final long settleSeconds;
+    private final GitRunner git;
 
     /**
      * Creates a protocol instance.
@@ -76,11 +88,32 @@ public final class LeaseProtocol {
      */
     public LeaseProtocol(Path ikeDev, Path home, Path workingDirectory,
                          String defaultTtl, long settleSeconds) {
+        this(ikeDev, home, workingDirectory, defaultTtl, settleSeconds,
+                new ProcessGitRunner());
+    }
+
+    /**
+     * Creates a protocol instance with an explicit git runner — the one
+     * that writes sibling bundles (IKE-Network/ike-issues#1216).
+     *
+     * @param ikeDev           the development-folder root
+     * @param home             the home directory (machine identity,
+     *                         Syncthing config)
+     * @param workingDirectory base for resolving relative paths in
+     *                         {@link #resolve}
+     * @param defaultTtl       the ttl written into every record
+     * @param settleSeconds    the confirm read-back's settle window
+     * @param git              runs git for sibling bundles
+     */
+    public LeaseProtocol(Path ikeDev, Path home, Path workingDirectory,
+                         String defaultTtl, long settleSeconds,
+                         GitRunner git) {
         this.ikeDev = ikeDev;
         this.home = home;
         this.workingDirectory = workingDirectory;
         this.defaultTtl = defaultTtl;
         this.settleSeconds = settleSeconds;
+        this.git = git;
     }
 
     // ── verbs ───────────────────────────────────────────────────────
@@ -104,16 +137,35 @@ public final class LeaseProtocol {
     }
 
     /**
-     * Acquires the lease — optimistically, unless {@code confirm}.
+     * Takes the lease when it is free or expired — optimistically, unless
+     * {@code confirm}. A lease held live elsewhere is refused with the
+     * {@code recall} command that would take it.
      *
      * @param workingSet the working-set name
-     * @param force      take over a live lease (the human's decision)
      * @param quiet      suppress success chatter
      * @param confirm    read the record back after the settle window
      * @return the outcome
      */
-    public Outcome acquire(String workingSet, boolean force, boolean quiet,
-                           boolean confirm) {
+    public Outcome take(String workingSet, boolean quiet, boolean confirm) {
+        return takeOrRecall(workingSet, false, quiet, confirm);
+    }
+
+    /**
+     * Recalls the lease: takes it even when another machine holds it live,
+     * fencing that machine. Always the human's decision — never called on
+     * a tool's own initiative.
+     *
+     * @param workingSet the working-set name
+     * @param quiet      suppress success chatter
+     * @param confirm    read the record back after the settle window
+     * @return the outcome
+     */
+    public Outcome recall(String workingSet, boolean quiet, boolean confirm) {
+        return takeOrRecall(workingSet, true, quiet, confirm);
+    }
+
+    private Outcome takeOrRecall(String workingSet, boolean recall,
+                                 boolean quiet, boolean confirm) {
         StringBuilder out = new StringBuilder();
         StringBuilder err = new StringBuilder();
         Optional<String> me = machineId(err);
@@ -136,9 +188,13 @@ public final class LeaseProtocol {
                 .orElse(List.of());
         switch (state) {
             case "MINE" -> {
-                write(workingSet, "held", me.get(), epoch,
+                List<RepoStamp> stamps = RefStamper.collect(ikeDev,
+                        workingSet);
+                refreshBundles(workingSet, record, me.get(), stamps, false,
+                        err);
+                write(workingSet, RecordState.HELD, me.get(), epoch,
                         record.map(LeaseRecord::acquired).orElse(""), now,
-                        RefStamper.collect(ikeDev, workingSet));
+                        stamps);
                 if (!quiet) {
                     out.append("already held here (epoch ").append(epoch)
                             .append(") — renewed\n");
@@ -146,9 +202,10 @@ public final class LeaseProtocol {
             }
             case "FREE", "EXPIRED" -> {
                 epoch += 1;
-                write(workingSet, "held", me.get(), epoch, now, now, carried);
+                write(workingSet, RecordState.HELD, me.get(), epoch, now, now,
+                        carried);
                 if (!quiet) {
-                    out.append("acquired ").append(workingSet)
+                    out.append("took ").append(workingSet)
                             .append(" (epoch ").append(epoch)
                             .append(", holder ").append(me.get())
                             .append(")\n");
@@ -156,20 +213,21 @@ public final class LeaseProtocol {
             }
             case "LIVE" -> {
                 String prev = record.map(LeaseRecord::holder).orElse("");
-                if (!force) {
+                if (!recall) {
                     err.append("HELD by ").append(prev).append(" — renewed ")
                             .append(record.map(LeaseRecord::renewed).orElse(""))
                             .append(".\n");
-                    err.append("Takeover of a live lease is a human decision."
-                            + " To take it:\n");
-                    err.append("  lease.sh acquire '").append(workingSet)
-                            .append("' --force\n");
+                    err.append("Recalling a live lease is a human decision."
+                            + " To recall it:\n");
+                    err.append("  lease.sh recall '").append(workingSet)
+                            .append("'\n");
                     return new Outcome(1, out.toString(), err.toString());
                 }
                 epoch += 1;
-                write(workingSet, "held", me.get(), epoch, now, now, carried);
+                write(workingSet, RecordState.HELD, me.get(), epoch, now, now,
+                        carried);
                 if (!quiet) {
-                    out.append("TOOK OVER ").append(workingSet)
+                    out.append("RECALLED ").append(workingSet)
                             .append(" from ").append(prev)
                             .append(" (epoch ").append(epoch).append(") — ")
                             .append(prev).append(" is fenced\n");
@@ -220,9 +278,9 @@ public final class LeaseProtocol {
                 return new Outcome(0, out.toString(), err.toString());
             }
             case "FREE", "EXPIRED" -> {
-                Outcome acquired = acquire(workingSet, false, true, confirm);
-                return new Outcome(acquired.exitCode() == 0 ? 0 : 1,
-                        out + acquired.stdout(), err + acquired.stderr());
+                Outcome taken = take(workingSet, true, confirm);
+                return new Outcome(taken.exitCode() == 0 ? 0 : 1,
+                        out + taken.stdout(), err + taken.stderr());
             }
             default -> {    // LIVE — the deny reason goes to stdout
                 out.append("Working set '").append(workingSet)
@@ -236,10 +294,10 @@ public final class LeaseProtocol {
                         .append(").\n");
                 out.append("Single-writer is enforced per working set, so "
                         + "writes from here are fenced.\n");
-                out.append("Taking over a live lease is the human's call — "
+                out.append("Recalling a live lease is the human's call — "
                         + "ask before running:\n");
-                out.append("  ~/ike-dev/scripts/lease.sh acquire '")
-                        .append(workingSet).append("' --force\n");
+                out.append("  ~/ike-dev/scripts/lease.sh recall '")
+                        .append(workingSet).append("'\n");
                 return new Outcome(1, out.toString(), err.toString());
             }
         }
@@ -259,21 +317,26 @@ public final class LeaseProtocol {
             return new Outcome(1, "", err.toString());
         }
         Optional<LeaseRecord> record = LeaseRecord.read(leaseFile(workingSet));
-        write(workingSet, "held", machineId(err).orElse(""),
+        String me = machineId(err).orElse("");
+        List<RepoStamp> stamps = RefStamper.collect(ikeDev, workingSet);
+        refreshBundles(workingSet, record, me, stamps, false, err);
+        write(workingSet, RecordState.HELD, me,
                 record.map(LeaseRecord::epoch).orElse(0L),
                 record.map(LeaseRecord::acquired).orElse(""),
                 ISO.format(Instant.now()),
-                RefStamper.collect(ikeDev, workingSet));
+                stamps);
         return new Outcome(0, "", err.toString());
     }
 
     /**
-     * Releases a lease this machine holds.
+     * Returns a lease this machine holds, so the next machine takes it
+     * silently. Named {@code returnLease} because {@code return} is a Java
+     * keyword; the verb everywhere else is {@code return}.
      *
      * @param workingSet the working-set name
      * @return the outcome
      */
-    public Outcome release(String workingSet) {
+    public Outcome returnLease(String workingSet) {
         StringBuilder out = new StringBuilder();
         StringBuilder err = new StringBuilder();
         Optional<String> me = machineId(err);
@@ -290,18 +353,23 @@ public final class LeaseProtocol {
             // this message starts, as the shell's command substitution did.
             String description = describe(workingSet, err);
             err.append("not held by this machine (").append(description)
-                    .append(") — nothing released\n");
+                    .append(") — nothing returned\n");
             return new Outcome(1, out.toString(), err.toString());
         }
         Optional<LeaseRecord> record = LeaseRecord.read(leaseFile(workingSet));
-        // The release stamp is the one that matters most: it records the
-        // refs the machine switch will align to (ike-issues#1069).
-        write(workingSet, "released", me.get(),
+        // The return stamp is the one that matters most: it records the
+        // refs the machine switch will align to (ike-issues#1069). For a
+        // sibling the bundles carry the commits themselves (#1216); they
+        // are written before the record, so a record never announces a
+        // return whose history has not been written.
+        List<RepoStamp> stamps = RefStamper.collect(ikeDev, workingSet);
+        refreshBundles(workingSet, record, me.get(), stamps, true, err);
+        write(workingSet, RecordState.RETURNED, me.get(),
                 record.map(LeaseRecord::epoch).orElse(0L),
                 record.map(LeaseRecord::acquired).orElse(""),
                 ISO.format(Instant.now()),
-                RefStamper.collect(ikeDev, workingSet));
-        out.append("released ").append(workingSet).append('\n');
+                stamps);
+        out.append("returned ").append(workingSet).append('\n');
         return new Outcome(0, out.toString(), err.toString());
     }
 
@@ -384,7 +452,7 @@ public final class LeaseProtocol {
         if (record.isEmpty()) {
             return "FREE";
         }
-        if ("released".equals(record.get().state())) {
+        if (record.get().state() == RecordState.RETURNED) {
             return "FREE";
         }
         Optional<String> me = machineId(err);
@@ -414,7 +482,7 @@ public final class LeaseProtocol {
                 .map(t -> (Instant.now().getEpochSecond() - t) / 60)
                 .orElse(0L);
         return switch (state == null ? "" : state) {
-            case "FREE" -> workingSet + ": FREE (released by " + r.holder()
+            case "FREE" -> workingSet + ": FREE (returned by " + r.holder()
                     + ", epoch " + r.epoch() + ")";
             case "MINE" -> workingSet + ": MINE (" + r.holder() + ", epoch "
                     + r.epoch() + ", renewed " + age + "m ago)";
@@ -467,7 +535,7 @@ public final class LeaseProtocol {
                 Files.copy(bestFile, main,
                         StandardCopyOption.REPLACE_EXISTING);
                 err.append("reconciled ").append(workingSet)
-                        .append(": contested acquisition resolved to ")
+                        .append(": contested take resolved to ")
                         .append(bestHolder).append(" (epoch ")
                         .append(bestEpoch).append(")\n");
             }
@@ -503,12 +571,46 @@ public final class LeaseProtocol {
         err.append("LOST THE RACE for ").append(workingSet)
                 .append(" — another machine's claim won.\n");
         err.append("  ").append(describe(workingSet, err)).append('\n');
-        err.append("  Do not write to this working set; re-acquire "
-                + "deliberately if you meant to take it.\n");
+        err.append("  Do not write to this working set; take it again "
+                + "deliberately if you meant to have it.\n");
         return false;
     }
 
-    private void write(String workingSet, String state, String holder,
+    /**
+     * Keeps a sibling's bundles in step with its committed history
+     * (IKE-Network/ike-issues#1216). On a return every member is written;
+     * on a renew only when this machine's heads moved since its own last
+     * stamps, so the half-life renew stays cheap when nothing was
+     * committed. Bundle trouble is reported, never fatal: the lease write
+     * that follows is the fencing state, and it must not depend on git.
+     */
+    private void refreshBundles(String workingSet,
+                                Optional<LeaseRecord> previous, String me,
+                                List<RepoStamp> stamps, boolean returning,
+                                StringBuilder err) {
+        WorkingSetName name;
+        try {
+            name = new WorkingSetName(workingSet);
+        } catch (IllegalArgumentException e) {
+            return;
+        }
+        if (!name.isSibling()) {
+            return;
+        }
+        boolean headsMoved = previous
+                .filter(r -> r.holder().equals(me))
+                .map(r -> !r.stamps().equals(stamps))
+                .orElse(true);
+        if (!returning && !headsMoved
+                && SiblingBundles.complete(ikeDev, name, stamps)) {
+            return;
+        }
+        for (String problem : SiblingBundles.write(ikeDev, name, git)) {
+            err.append("bundle: ").append(problem).append('\n');
+        }
+    }
+
+    private void write(String workingSet, RecordState state, String holder,
                        long epoch, String acquired, String renewed,
                        List<RepoStamp> stamps) {
         LeaseRecord record = new LeaseRecord(workingSet, state, holder, epoch,

@@ -32,14 +32,14 @@ import java.util.function.Function;
  * <ol>
  *   <li><b>Fenced notification.</b> Between passes the daemon remembers
  *       which leases were MINE; one now held live by another machine
- *       means this machine slept through a takeover, and the human gets
+ *       means this machine slept through a recall, and the human gets
  *       told promptly instead of discovering it at the next denied
  *       write.</li>
  *   <li><b>Record garbage collection.</b> A lease record whose working
  *       set no longer exists is noise forever, but GC must never eat a
  *       record whose <em>tree simply has not synced yet</em> — records
  *       travel faster than trees (the scan-force covers only
- *       {@code leases/}). So only released records, or ones long past
+ *       {@code leases/}). So only returned records, or ones long past
  *       their staleness horizon, are collected.</li>
  *   <li><b>The non-participant alarm.</b> A lease is a claim, and only
  *       participants make claims; the open-project probe is the monitor
@@ -54,7 +54,7 @@ import java.util.function.Function;
  */
 public final class LeaseDaemon {
 
-    /** GC eligibility for a non-released record: a day past renewal. */
+    /** GC eligibility for a non-returned record: a day past renewal. */
     private static final long GC_AGE_SECONDS = 24L * 3600L;
 
     /** Minimum seconds between probe passes. */
@@ -137,17 +137,17 @@ public final class LeaseDaemon {
                 continue;
             }
             boolean mine = record.get().holder().equals(me.get())
-                    && !"released".equals(record.get().state());
+                    && record.get().state() != RecordState.RETURNED;
             if (mine) {
                 currentMine.add(ws);
             }
             if (priorMine.contains(ws) && !mine
-                    && !"released".equals(record.get().state())) {
+                    && record.get().state() != RecordState.RETURNED) {
                 // Held here last pass, now held elsewhere: this machine
-                // slept through a takeover. The watcher and the fence
+                // slept through a recall. The watcher and the fence
                 // already stand down on their own; the human just gets
                 // told promptly.
-                String message = ws + " was taken over by "
+                String message = ws + " was recalled by "
                         + record.get().holder() + " (epoch "
                         + record.get().epoch() + ") while this machine "
                         + "was not looking. It is theirs now.";
@@ -181,16 +181,21 @@ public final class LeaseDaemon {
         if (Files.isDirectory(ikeDev.resolve(ws))) {
             return;
         }
-        boolean released = "released".equals(record.state());
+        boolean returned = record.state() == RecordState.RETURNED;
         boolean longExpired = renewedEpoch(record)
                 .map(renewed -> Instant.now().getEpochSecond() - renewed
                         > GC_AGE_SECONDS)
                 .orElse(false);
-        if (released || longExpired) {
+        if (returned || longExpired) {
             try {
                 Files.deleteIfExists(leaseFile(ws));
+                try {
+                    SiblingBundles.deleteAll(ikeDev, new WorkingSetName(ws));
+                } catch (IllegalArgumentException e) {
+                    // Not a valid working-set name: no bundles to remove.
+                }
                 log.add("GC: removed record for missing working set " + ws
-                        + " (" + (released ? "released" : "long expired")
+                        + " (" + (returned ? "returned" : "long expired")
                         + ")");
             } catch (IOException e) {
                 log.add("GC: could not remove " + ws + ": " + e.getMessage());
@@ -235,7 +240,7 @@ public final class LeaseDaemon {
             }
             Optional<LeaseRecord> record = LeaseRecord.read(leaseFile(ws));
             String holder = record
-                    .filter(r -> !"released".equals(r.state()))
+                    .filter(r -> r.state() != RecordState.RETURNED)
                     .map(LeaseRecord::holder).orElse("");
             for (String machine : openOn) {
                 if (!machine.equals(holder)) {
@@ -302,7 +307,7 @@ public final class LeaseDaemon {
         for (String ws : leaseRecordNames()) {
             Optional<LeaseRecord> record = LeaseRecord.read(leaseFile(ws));
             if (record.isEmpty()
-                    || !"held".equals(record.get().state())) {
+                    || record.get().state() != RecordState.HELD) {
                 continue;
             }
             long ttl = LeaseProtocol.ttlToSeconds(record.get().ttl());

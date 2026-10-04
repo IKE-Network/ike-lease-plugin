@@ -5,11 +5,15 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * The lease protocol's command-line face — argv-compatible with
- * {@code lease.sh} v2, which is now a thin wrapper that {@code exec}s
- * this class (IKE-Network/ike-issues#1067). Same verbs, same flags, same
- * messages, same exit codes; the golden equivalence tests hold the two
- * to that.
+ * The lease protocol's command-line face — {@code lease.sh} is a thin
+ * wrapper that {@code exec}s this class (IKE-Network/ike-issues#1067).
+ *
+ * <p>Verbs follow the library-loan vocabulary of
+ * IKE-Network/ike-issues#1215: {@code take}, {@code renew},
+ * {@code return}, {@code recall}. The verbs of {@code lease.sh} v2 still
+ * work as aliases — {@code acquire} for take, {@code acquire --force} for
+ * recall, {@code release} for return — so scripts and habits keep working
+ * while the fleet moves over; their output uses the new words.
  *
  * <p>Environment, exactly as the shell read it: {@code IKE_DEV}
  * (default {@code $HOME/ike-dev}), {@code IKE_LEASE_TTL} (default
@@ -22,8 +26,9 @@ public final class LeaseProtocolCli {
     /**
      * Entry point.
      *
-     * @param args {@code status|ensure|acquire|renew|release|list|resolve}
-     *             with their arguments, as {@code lease.sh} always took them
+     * @param args {@code status|ensure|take|renew|return|recall|list|resolve}
+     *             with their arguments; the v2 verbs are accepted as
+     *             aliases
      */
     public static void main(String[] args) {
         // HOME the environment variable, not the JVM's user.home: the
@@ -60,17 +65,26 @@ public final class LeaseProtocolCli {
         LeaseProtocol.Outcome outcome = switch (verb) {
             case "status" -> rest.isEmpty() ? null
                     : protocol.status(rest.get(0));
-            case "acquire" -> rest.isEmpty() ? null
-                    : protocol.acquire(rest.get(0),
-                            rest.contains("--force"),
-                            rest.contains("--quiet"),
+            case "take" -> rest.isEmpty() ? null
+                    : protocol.take(rest.get(0), rest.contains("--quiet"),
                             rest.contains("--confirm"));
+            case "recall" -> rest.isEmpty() ? null
+                    : protocol.recall(rest.get(0), rest.contains("--quiet"),
+                            rest.contains("--confirm"));
+            case "acquire" -> rest.isEmpty() ? null     // v2 alias
+                    : rest.contains("--force")
+                            ? protocol.recall(rest.get(0),
+                                    rest.contains("--quiet"),
+                                    rest.contains("--confirm"))
+                            : protocol.take(rest.get(0),
+                                    rest.contains("--quiet"),
+                                    rest.contains("--confirm"));
             case "ensure" -> rest.isEmpty() ? null
                     : protocol.ensure(rest.get(0), rest.contains("--confirm"));
             case "renew" -> rest.isEmpty() ? null
                     : protocol.renew(rest.get(0));
-            case "release" -> rest.isEmpty() ? null
-                    : protocol.release(rest.get(0));
+            case "return", "release" -> rest.isEmpty() ? null   // release: v2 alias
+                    : protocol.returnLease(rest.get(0));
             case "list" -> protocol.list();
             case "resolve" -> rest.isEmpty() ? null
                     : protocol.resolve(rest.get(0));
@@ -90,11 +104,18 @@ public final class LeaseProtocolCli {
 
                   status  <ws>              describe the lease; exit 1 if held live elsewhere
                   ensure  <ws> [--confirm]  hold it if that needs no human decision
-                  acquire <ws> [--force] [--quiet] [--confirm]
+                  take    <ws> [--quiet] [--confirm]
+                                            take a free or expired lease
                   renew   <ws>              refresh the renewal stamp
-                  release <ws>              give up a lease this machine holds
+                  return  <ws>              return a lease this machine holds
+                  recall  <ws> [--quiet] [--confirm]
+                                            take a lease held live elsewhere —
+                                            the human's decision, never automatic
                   list                      every lease record and its state
                   resolve <path>            the working set a path belongs to
+
+                  v2 verbs still work: acquire (take), acquire --force (recall),
+                  release (return).
 
                   --confirm  read the record back after the sync-layer settle
                 """

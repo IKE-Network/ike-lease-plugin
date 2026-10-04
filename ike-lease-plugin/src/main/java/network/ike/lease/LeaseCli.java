@@ -32,6 +32,15 @@ public final class LeaseCli {
      */
     private static final long CONFIRM_TIMEOUT_SECONDS = 120L;
 
+    /**
+     * Seconds to wait for a call that may write a sibling's history
+     * bundles (IKE-Network/ike-issues#1216): a return writes one per
+     * member, and a renew refreshes those whose head moved. Killing such a
+     * call at the ordinary ten seconds would leave the lease record
+     * unwritten, which is far worse than a slow close.
+     */
+    private static final long HISTORY_TIMEOUT_SECONDS = 120L;
+
     private final Path ikeDev;
 
     /**
@@ -89,27 +98,30 @@ public final class LeaseCli {
     /**
      * Takes the lease when doing so needs no human decision.
      *
-     * <p>Free and expired leases are acquired silently. A lease held live
-     * by another machine is left alone — taking it over is the operator's
-     * decision, surfaced through the takeover dialog.
+     * <p>Free and expired leases are taken silently. A lease held live by
+     * another machine is left alone — recalling it is the operator's
+     * decision, surfaced through the recall dialog. A held lease is renewed
+     * at half-life, which may refresh a sibling's history bundles, hence
+     * the longer timeout.
      *
      * @param workingSet the working-set directory name
      * @return {@code true} when this machine now holds the lease
      */
     public boolean ensure(String workingSet) {
-        return run("ensure", workingSet).exitCode() == 0;
+        return run(HISTORY_TIMEOUT_SECONDS, "ensure", workingSet)
+                .exitCode() == 0;
     }
 
     /**
      * Takes the lease as {@link #ensure} does, then reads the record back
      * after the sync layer has had time to deliver a competing claim.
      *
-     * <p>Measured 2026-08-12: two machines acquiring the same <em>free</em>
+     * <p>Measured 2026-08-12: two machines taking the same <em>free</em>
      * lease inside the propagation window both succeed, the sync layer
      * settles it last-writer-wins with no conflict copy, and the loser is
      * never told. The epoch cannot catch this — both machines mint the same
      * epoch from the same starting record — so the read-back is the only
-     * thing that makes an acquisition trustworthy.
+     * thing that makes a take trustworthy.
      *
      * <p>This blocks for the settle window, roughly 25 seconds. Call it
      * only for consequential steps, and never on the event dispatch thread.
@@ -125,23 +137,27 @@ public final class LeaseCli {
     }
 
     /**
-     * Takes the lease from whoever holds it, advancing the fencing epoch.
+     * Recalls the lease from whoever holds it, advancing the fencing epoch
+     * so the holder stands down. Only ever the operator's decision.
      *
      * @param workingSet the working-set directory name
-     * @return {@code true} when the takeover was written successfully
+     * @return {@code true} when the recall was written successfully
      */
-    public boolean forceAcquire(String workingSet) {
-        return run("acquire", workingSet, "--force").exitCode() == 0;
+    public boolean recall(String workingSet) {
+        return run("recall", workingSet).exitCode() == 0;
     }
 
     /**
-     * Releases a lease this machine holds.
+     * Returns a lease this machine holds, writing a sibling's history
+     * bundles first. Named {@code returnLease} because {@code return} is a
+     * Java keyword.
      *
      * @param workingSet the working-set directory name
-     * @return {@code true} when the lease was released
+     * @return {@code true} when the lease was returned
      */
-    public boolean release(String workingSet) {
-        return run("release", workingSet).exitCode() == 0;
+    public boolean returnLease(String workingSet) {
+        return run(HISTORY_TIMEOUT_SECONDS, "return", workingSet)
+                .exitCode() == 0;
     }
 
     /**

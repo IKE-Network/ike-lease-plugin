@@ -92,13 +92,15 @@ class RefStamperTest {
     }
 
     @Test
-    void siblingsAreNeverStamped() throws IOException {
+    void siblingsAreStampedLikeRoots() throws IOException {
         Path ikeDev = ikeDev();
-        repo(ikeDev.resolve("my-root꞉feature"), "feature/feature");
+        Path sibling = repo(ikeDev.resolve("my-root꞉feature"),
+                "feature/feature");
 
-        assertEquals(List.of(),
+        assertEquals(List.of(new RepoStamp(".", "feature/feature",
+                        revParse(sibling, "HEAD"))),
                 RefStamper.collect(ikeDev, "my-root꞉feature"),
-                "a sibling's refs are its own (ike-issues#992)");
+                "a sibling's history travels now (ike-issues#1216)");
     }
 
     @Test

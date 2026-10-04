@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit;
  * Watches the synchronized lease directory and stands this machine down
  * when it is fenced.
  *
- * <p>This is the half of the protocol that makes takeover work without any
+ * <p>This is the half of the protocol that makes a recall work without any
  * machine-to-machine call: the lease record arrives through file sync, and
  * observing that a project this machine has open is now held by someone
  * else is the whole signal. The response is to save every document first,
@@ -148,7 +148,7 @@ public final class LeaseWatcher implements Disposable {
      * behind an unsaved buffer.
      *
      * <p>Shared with {@link LeaseProjectListener}, which reaches the same
-     * outcome by a different route — the operator declining to take over a
+     * outcome by a different route — the operator declining to recall a
      * working set someone else holds. There is exactly one way to stand
      * down, so there is exactly one implementation of it.
      *
@@ -173,7 +173,7 @@ public final class LeaseWatcher implements Disposable {
         }
         // Only ever close a FULLY OPENED project. A stand-down can be
         // queued while the project is still initializing — declining the
-        // takeover dialog raised at the open gesture is exactly that case
+        // recall dialog raised at the open gesture is exactly that case
         // — and closing a half-initialized project cancels its container
         // mid-startup and wedges the platform's action system: every
         // menu population thereafter dies with
@@ -202,7 +202,7 @@ public final class LeaseWatcher implements Disposable {
     /**
      * Runs an action on the event dispatch thread at non-modal modality,
      * no earlier than the project's startup completing. The one gate both
-     * consequential lease surfaces share: the takeover decision and the
+     * consequential lease surfaces share: the recall decision and the
      * stand-down close both belong on a clean, fully-opened stack
      * (ike-issues#1077). A project disposed before it finishes opening
      * drops the action, which is the correct outcome for both.

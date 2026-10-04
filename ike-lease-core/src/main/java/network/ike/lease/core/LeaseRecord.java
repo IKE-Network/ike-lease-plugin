@@ -27,7 +27,7 @@ import java.util.Optional;
  * accepts: stamps are best-effort metadata, never fencing state).
  *
  * @param workingSet the working-set directory name
- * @param state      {@code held} or {@code released}
+ * @param state      what the last writer did: held or returned
  * @param holder     the machine id that wrote the record
  * @param epoch      the monotonic fencing token
  * @param acquired   ISO-8601 UTC acquisition stamp
@@ -36,15 +36,15 @@ import java.util.Optional;
  * @param stamps     the holder's per-repository ref stamps, empty for
  *                   sibling working sets and pre-stamp records
  */
-public record LeaseRecord(String workingSet, String state, String holder,
+public record LeaseRecord(String workingSet, RecordState state, String holder,
                           long epoch, String acquired, String renewed,
                           String ttl, java.util.List<RepoStamp> stamps) {
 
     /**
-     * Canonicalizes the stamp list.
+     * Canonicalizes the state and the stamp list.
      *
      * @param workingSet the working-set directory name
-     * @param state      {@code held} or {@code released}
+     * @param state      what the last writer did: held or returned
      * @param holder     the machine id that wrote the record
      * @param epoch      the monotonic fencing token
      * @param acquired   ISO-8601 UTC acquisition stamp
@@ -53,6 +53,7 @@ public record LeaseRecord(String workingSet, String state, String holder,
      * @param stamps     the holder's per-repository ref stamps
      */
     public LeaseRecord {
+        state = state == null ? RecordState.UNKNOWN : state;
         stamps = stamps == null ? java.util.List.of()
                 : java.util.List.copyOf(stamps);
     }
@@ -61,14 +62,14 @@ public record LeaseRecord(String workingSet, String state, String holder,
      * Creates a stampless record — the v2 shape.
      *
      * @param workingSet the working-set directory name
-     * @param state      {@code held} or {@code released}
+     * @param state      what the last writer did: held or returned
      * @param holder     the machine id that wrote the record
      * @param epoch      the monotonic fencing token
      * @param acquired   ISO-8601 UTC acquisition stamp
      * @param renewed    ISO-8601 UTC renewal stamp
      * @param ttl        the staleness horizon, ISO-8601 duration
      */
-    public LeaseRecord(String workingSet, String state, String holder,
+    public LeaseRecord(String workingSet, RecordState state, String holder,
                        long epoch, String acquired, String renewed,
                        String ttl) {
         this(workingSet, state, holder, epoch, acquired, renewed, ttl,
@@ -116,7 +117,7 @@ public record LeaseRecord(String workingSet, String state, String holder,
                     : name;
             return Optional.of(new LeaseRecord(
                     field(lines, "working-set").orElse(fallbackWs),
-                    field(lines, "state").orElse(""),
+                    RecordState.parse(field(lines, "state").orElse("")),
                     field(lines, "holder").orElse(""),
                     parseEpoch(field(lines, "epoch").orElse("0")),
                     field(lines, "acquired").orElse(""),
@@ -141,7 +142,7 @@ public record LeaseRecord(String workingSet, String state, String holder,
                 "# Working-set lease — written by scripts/lease.sh.\n"
                 + "# Holder has sole write access; see IKE-Network/ike-issues#1002.\n"
                 + "working-set: " + workingSet + "\n"
-                + "state: " + state + "\n"
+                + "state: " + state.spelling() + "\n"
                 + "holder: " + holder + "\n"
                 + "epoch: " + epoch + "\n"
                 + "acquired: " + acquired + "\n"

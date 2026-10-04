@@ -51,12 +51,18 @@ class LeaseDaemonTest {
                 (title, message) -> notifications.add(title + ": " + message));
     }
 
+    /**
+     * Writes a record with the state spelled exactly as given, so fixtures
+     * can stand for a pre-ike-lease-7 machine ({@code released}) as well
+     * as this one ({@code returned}).
+     */
     private void record(String ws, String state, String holder, long epoch,
                         String renewed) throws IOException {
+        String content = new LeaseRecord(ws, RecordState.parse(state), holder,
+                epoch, renewed, renewed, "PT10M").serialize()
+                .replaceFirst("(?m)^state: .*$", "state: " + state);
         Files.writeString(ikeDev.resolve("leases").resolve(ws + ".lease"),
-                new LeaseRecord(ws, state, holder, epoch, renewed, renewed,
-                        "PT10M").serialize(),
-                StandardCharsets.UTF_8);
+                content, StandardCharsets.UTF_8);
     }
 
     private String stamp(long secondsAgo) {
@@ -75,7 +81,7 @@ class LeaseDaemonTest {
         List<String> log = daemon.pass(false);
 
         assertEquals(1, notifications.size());
-        assertTrue(notifications.getFirst().contains("taken over by "
+        assertTrue(notifications.getFirst().contains("recalled by "
                 + OTHER), notifications.toString());
         assertTrue(log.stream().anyMatch(l -> l.startsWith("FENCED:")));
 
@@ -90,7 +96,12 @@ class LeaseDaemonTest {
         LeaseDaemon daemon = daemon(ws -> "");
         record("still-syncing", "held", OTHER, 1, stamp(60));
         record("long-gone", "held", OTHER, 1, stamp(3L * 24 * 3600));
-        record("finished", "released", ME, 2, stamp(60));
+        record("finished", "released", ME, 2, stamp(60));     // older core
+        record("finished-new", "returned", ME, 2, stamp(60));
+        Path bundles = ikeDev.resolve("leases/finished-new.bundles");
+        Files.createDirectories(bundles);
+        Files.writeString(bundles.resolve("_root.bundle"), "stale\n",
+                StandardCharsets.UTF_8);
 
         List<String> log = daemon.pass(false);
 
@@ -100,7 +111,13 @@ class LeaseDaemonTest {
         assertFalse(Files.exists(ikeDev.resolve("leases/long-gone.lease")),
                 "a day past its horizon with no tree = garbage");
         assertFalse(Files.exists(ikeDev.resolve("leases/finished.lease")),
-                "a released record with no tree = garbage");
+                "a returned record with no tree = garbage, in the legacy "
+                        + "spelling too");
+        assertFalse(Files.exists(
+                        ikeDev.resolve("leases/finished-new.lease")),
+                "a returned record with no tree = garbage");
+        assertFalse(Files.exists(bundles),
+                "its history bundles go with it (ike-issues#1216)");
         assertTrue(log.stream().anyMatch(l -> l.contains("left alone")));
     }
 

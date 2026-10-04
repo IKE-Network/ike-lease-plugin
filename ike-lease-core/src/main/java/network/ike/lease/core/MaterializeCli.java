@@ -82,33 +82,44 @@ public final class MaterializeCli {
                 line -> System.out.println("  " + line));
         RefAligner aligner = new RefAligner(ikeDev, new ProcessGitRunner(),
                 line -> System.out.println("  " + line));
+        SiblingAligner siblingAligner = new SiblingAligner(ikeDev,
+                new ProcessGitRunner(), line -> System.out.println("  " + line));
         List<RepoStamp> stamps = name.isSibling() ? List.of()
                 : RefAligner.recordedStamps(ikeDev, name.value());
+        boolean bundled = SiblingAligner.hasBundles(ikeDev, name);
 
-        // Ref alignment (ike-issues#1069) reports in the same three
-        // verbs: `verify` checks refs against the stamps offline,
-        // `repair` aligns them (fetch, move ref and HEAD, reset --mixed,
-        // tree untouched), and `materialize` aligns freshly created root
-        // repositories the same way. Roots only — a sibling's repair
-        // stays the origin re-point, and its refs are its own.
+        // Ref alignment reports in the same three verbs: `verify` checks
+        // refs offline, `repair` aligns them, and `materialize` aligns
+        // freshly created repositories the same way — always by moving
+        // refs and `reset --mixed`, tree untouched. A root aligns to the
+        // holder's stamps (ike-issues#1069); a sibling to the history its
+        // last holder left in bundles (ike-issues#1216), and its repair
+        // also re-points legacy origins.
         MaterializeReport report;
         RefAligner.AlignReport alignment = null;
         switch (command) {
             case "materialize" -> {
                 report = materializer.materialize(name);
-                if (!name.isSibling() && !stamps.isEmpty()) {
+                if (name.isSibling() && bundled) {
+                    alignment = siblingAligner.align(name);
+                } else if (!name.isSibling() && !stamps.isEmpty()) {
                     alignment = aligner.align(name, stamps);
                 }
             }
             case "verify" -> {
                 report = materializer.verify(name);
-                if (!name.isSibling() && !stamps.isEmpty()) {
+                if (name.isSibling() && bundled) {
+                    alignment = siblingAligner.check(name);
+                } else if (!name.isSibling() && !stamps.isEmpty()) {
                     alignment = aligner.check(name, stamps);
                 }
             }
             case "repair" -> {
                 if (name.isSibling()) {
                     report = materializer.repair(name);
+                    if (bundled) {
+                        alignment = siblingAligner.align(name);
+                    }
                 } else {
                     report = null;
                     alignment = aligner.align(name, stamps);

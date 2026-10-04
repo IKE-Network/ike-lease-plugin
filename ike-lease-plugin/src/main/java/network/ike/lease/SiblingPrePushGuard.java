@@ -27,7 +27,7 @@ import network.ike.lease.core.WorkingSetName;
  * pushed to the same remote branch would fight with non-fast-forward
  * errors there. Externalization is the parent's own explicit
  * {@code ws:push}. The Claude fence carries the mirror rule — the same
- * one-rule-on-both-surfaces pattern as takeover.
+ * one-rule-on-both-surfaces pattern as recall.
  *
  * <p>The guard binds only sibling repositories (a {@code ꞉} working-set
  * segment under the development folder) and only positively identified

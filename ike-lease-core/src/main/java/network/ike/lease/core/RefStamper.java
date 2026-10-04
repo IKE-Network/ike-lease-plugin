@@ -21,9 +21,11 @@ import java.util.Optional;
  * is simply skipped, because stamps are best-effort metadata: a missing
  * stamp costs an alignment opportunity, a wrong one would mis-aim it.
  *
- * <p>Siblings are never stamped: their branch is the name's {@code ꞉}
- * suffix, their base is the local parent, and the synced tree is
- * authoritative (IKE-Network/ike-issues#992).
+ * <p>Siblings are stamped too (IKE-Network/ike-issues#1216). They once
+ * were not, on the premise that a sibling's history is per-machine and
+ * disposable (IKE-Network/ike-issues#992); a sibling carried across
+ * machines for weeks disproved it. A sibling's stamps say where its
+ * history stands; its bundles carry the commits themselves.
  */
 final class RefStamper {
 
@@ -32,22 +34,18 @@ final class RefStamper {
     private RefStamper() { }
 
     /**
-     * Collects the current ref position of every repository in a root
-     * working set.
+     * Collects the current ref position of every repository in a working
+     * set, root or sibling.
      *
      * @param ikeDev     the development-folder root
      * @param workingSet the working-set directory name
      * @return one stamp per readable repository, {@code .} first; empty
-     *         for siblings, absent trees, and anything unreadable
+     *         for absent trees and anything unreadable
      */
     static List<RepoStamp> collect(Path ikeDev, String workingSet) {
-        WorkingSetName name;
         try {
-            name = new WorkingSetName(workingSet);
+            new WorkingSetName(workingSet);
         } catch (IllegalArgumentException e) {
-            return List.of();
-        }
-        if (name.isSibling()) {
             return List.of();
         }
         Path root = ikeDev.resolve(workingSet);

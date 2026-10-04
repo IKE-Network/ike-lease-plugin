@@ -7,12 +7,12 @@ import java.util.List;
  * One repository's ref position, stamped into a lease record by its
  * holder — the root-ref-alignment bus of IKE-Network/ike-issues#1069.
  *
- * <p>The holder stamps every repository of a held <em>root</em> working
- * set on the writes the protocol already makes (renew at half-life,
- * release); the taker aligns its refs to the stamps at acquisition
- * without touching the tree. Siblings stamp nothing: their branch is the
- * name's {@code ꞉} suffix, their base is the local parent, and the
- * synced tree is authoritative (IKE-Network/ike-issues#992).
+ * <p>The holder stamps every repository of a held working set on the
+ * writes the protocol already makes (renew at half-life, return); the
+ * taker of a root aligns its refs to the stamps when it takes the
+ * working set, without touching the tree. Siblings are stamped too
+ * (IKE-Network/ike-issues#1216), but align to their bundles, which carry
+ * the commits a stamp can only name.
  *
  * <p>On disk a stamp is one record line —
  * {@code stamp: <path> <branch> <head>} — appended after the v2 fields.

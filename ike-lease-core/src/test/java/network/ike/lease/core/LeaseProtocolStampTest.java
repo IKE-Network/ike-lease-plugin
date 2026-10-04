@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * a write by the current holder refreshes the stamps from its
  * repositories, a write that changes the holder carries the previous
  * record's stamps forward — they are the taker's alignment target — and
- * siblings are never stamped.
+ * siblings are stamped like roots (IKE-Network/ike-issues#1216).
  */
 class LeaseProtocolStampTest {
 
@@ -54,7 +54,7 @@ class LeaseProtocolStampTest {
             throws IOException {
         LeaseProtocol protocol = protocol();
         Path root = repo(ikeDev.resolve("my-ws"), "main");
-        assertEquals(0, protocol.acquire("my-ws", false, true, false)
+        assertEquals(0, protocol.take("my-ws", true, false)
                 .exitCode());
 
         assertEquals(0, protocol.renew("my-ws").exitCode());
@@ -66,15 +66,15 @@ class LeaseProtocolStampTest {
     }
 
     @Test
-    void acquireOfAReleasedLeaseCarriesTheStampsForward()
+    void takingAReturnedLeaseCarriesTheStampsForward()
             throws IOException {
         LeaseProtocol protocol = protocol();
         Files.createDirectories(ikeDev.resolve("my-ws"));
-        writeRecord(new LeaseRecord("my-ws", "released", OTHER, 4,
+        writeRecord(new LeaseRecord("my-ws", RecordState.RETURNED, OTHER, 4,
                 stamp(600), stamp(60), "PT10M",
                 List.of(new RepoStamp(".", "main", SHA_A))));
 
-        assertEquals(0, protocol.acquire("my-ws", false, true, false)
+        assertEquals(0, protocol.take("my-ws", true, false)
                 .exitCode());
 
         LeaseRecord record = record("my-ws");
@@ -87,15 +87,15 @@ class LeaseProtocolStampTest {
     }
 
     @Test
-    void forcedTakeoverOfALiveLeaseCarriesTheStampsForward()
+    void recallOfALiveLeaseCarriesTheStampsForward()
             throws IOException {
         LeaseProtocol protocol = protocol();
         Files.createDirectories(ikeDev.resolve("my-ws"));
-        writeRecord(new LeaseRecord("my-ws", "held", OTHER, 4,
+        writeRecord(new LeaseRecord("my-ws", RecordState.HELD, OTHER, 4,
                 stamp(600), stamp(10), "PT10M",
                 List.of(new RepoStamp(".", "main", SHA_A))));
 
-        assertEquals(0, protocol.acquire("my-ws", true, true, false)
+        assertEquals(0, protocol.recall("my-ws", true, false)
                 .exitCode());
 
         LeaseRecord record = record("my-ws");
@@ -105,32 +105,38 @@ class LeaseProtocolStampTest {
     }
 
     @Test
-    void releaseStampsTheFinalRefs() throws IOException {
+    void returnStampsTheFinalRefs() throws IOException {
         LeaseProtocol protocol = protocol();
         Path root = repo(ikeDev.resolve("my-ws"), "main");
-        assertEquals(0, protocol.acquire("my-ws", false, true, false)
+        assertEquals(0, protocol.take("my-ws", true, false)
                 .exitCode());
 
-        assertEquals(0, protocol.release("my-ws").exitCode());
+        assertEquals(0, protocol.returnLease("my-ws").exitCode());
 
         LeaseRecord record = record("my-ws");
-        assertEquals("released", record.state());
+        assertEquals(RecordState.RETURNED, record.state());
+        assertTrue(Files.readString(ikeDev.resolve("leases/my-ws.lease"),
+                        StandardCharsets.UTF_8).contains("state: returned\n"),
+                "this core writes the new spelling");
         assertEquals(List.of(new RepoStamp(".", "main",
                         revParse(root, "HEAD"))), record.stamps(),
-                "the release stamp is what the machine switch aligns to");
+                "the return stamp is what the machine switch aligns to");
     }
 
     @Test
-    void siblingsAreNeverStamped() throws IOException {
+    void siblingsAreStampedLikeRoots() throws IOException {
         LeaseProtocol protocol = protocol();
-        repo(ikeDev.resolve("my-ws꞉feature"), "feature/feature");
-        assertEquals(0, protocol.acquire("my-ws꞉feature", false, true,
-                false).exitCode());
+        Path sibling = repo(ikeDev.resolve("my-ws꞉feature"),
+                "feature/feature");
+        assertEquals(0, protocol.take("my-ws꞉feature", true, false)
+                .exitCode());
 
         assertEquals(0, protocol.renew("my-ws꞉feature").exitCode());
 
-        assertEquals(List.of(), record("my-ws꞉feature").stamps(),
-                "a sibling's refs are its own (ike-issues#992)");
+        assertEquals(List.of(new RepoStamp(".", "feature/feature",
+                        revParse(sibling, "HEAD"))),
+                record("my-ws꞉feature").stamps(),
+                "a sibling's history now travels (ike-issues#1216)");
     }
 
     // ------------------------------------------------------------------

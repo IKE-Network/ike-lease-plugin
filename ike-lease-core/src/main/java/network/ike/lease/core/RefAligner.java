@@ -29,9 +29,10 @@ import network.ike.lease.core.GitRunner.GitResult;
  * moving the ref would orphan them — every decision point defaults to
  * refuse-and-report (IKE-Network/ike-issues#1057).
  *
- * <p>Siblings are never aligned: their branch is the name's {@code ꞉}
- * suffix, their base is the local parent, and the synced tree is
- * authoritative (IKE-Network/ike-issues#992).
+ * <p>Siblings are not aligned here: their stamps name commits that exist
+ * only on the stamping machine, since a sibling's origin is the local
+ * parent. They align to their bundles instead ({@link SiblingAligner},
+ * IKE-Network/ike-issues#1216).
  */
 public final class RefAligner {
 
@@ -176,15 +177,14 @@ public final class RefAligner {
         List<Entry> entries = new ArrayList<>();
         if (name.isSibling()) {
             entries.add(new Entry(name.value(), Status.REFUSED,
-                    "alignment applies to roots; a sibling's branch is its "
-                            + "name's suffix and its base is the local parent "
-                            + "(ike-issues#992)"));
+                    "stamp alignment applies to roots; a sibling aligns to "
+                            + "its bundles (ike-issues#1216)"));
             return new AlignReport(name, entries);
         }
         if (stamps.isEmpty()) {
             entries.add(new Entry(name.value(), Status.NO_STAMP,
                     "the lease record carries no ref stamps; they appear "
-                            + "once a stamping holder renews or releases"));
+                            + "once a stamping holder renews or returns"));
             return new AlignReport(name, entries);
         }
         Path root = ikeDev.resolve(name.value());

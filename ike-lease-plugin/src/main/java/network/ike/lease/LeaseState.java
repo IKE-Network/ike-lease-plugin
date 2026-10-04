@@ -10,7 +10,7 @@ package network.ike.lease;
  */
 public enum LeaseState {
 
-    /** No record, or explicitly released: take it silently. */
+    /** No record, or returned: take it silently. */
     FREE,
 
     /** Held by this machine. */
@@ -19,7 +19,7 @@ public enum LeaseState {
     /** Held elsewhere but not renewed within its time-to-live: reclaimable. */
     EXPIRED,
 
-    /** Held elsewhere and fresh: takeover is the operator's decision. */
+    /** Held elsewhere and fresh: recalling it is the operator's decision. */
     LIVE,
 
     /** State could not be determined; callers should not fence on this. */

@@ -29,7 +29,7 @@ class LeaseRecordStampTest {
 
     @Test
     void stampedRecordRoundTripsThroughDisk() throws IOException {
-        LeaseRecord written = new LeaseRecord("my-ws", "held", "Machine-A",
+        LeaseRecord written = new LeaseRecord("my-ws", RecordState.HELD, "Machine-A",
                 7, "2026-08-22T10:00:00Z", "2026-08-22T10:05:00Z", "PT10M",
                 List.of(new RepoStamp(".", "main", SHA_A),
                         new RepoStamp("member", "feature/x", SHA_B)));
@@ -46,7 +46,7 @@ class LeaseRecordStampTest {
 
     @Test
     void stamplessRecordSerializesByteIdenticallyToV2() {
-        LeaseRecord record = new LeaseRecord("my-ws", "held", "Machine-A",
+        LeaseRecord record = new LeaseRecord("my-ws", RecordState.HELD, "Machine-A",
                 7, "2026-08-22T10:00:00Z", "2026-08-22T10:05:00Z", "PT10M");
         String expected =
                 "# Working-set lease — written by scripts/lease.sh.\n"
@@ -81,7 +81,7 @@ class LeaseRecordStampTest {
 
         LeaseRecord read = LeaseRecord.read(file).orElseThrow();
 
-        assertEquals("held", read.state());
+        assertEquals(RecordState.HELD, read.state());
         assertEquals(3, read.epoch());
         assertEquals(List.of(new RepoStamp(".", "main", SHA_A)),
                 read.stamps(),
@@ -92,7 +92,7 @@ class LeaseRecordStampTest {
     void preStampReaderSemanticsIgnoreStampLines() {
         // field() is the v2 read path every pre-stamp core uses: a
         // stamped record must answer exactly as an unstamped one does.
-        List<String> lines = new LeaseRecord("my-ws", "held", "Machine-A",
+        List<String> lines = new LeaseRecord("my-ws", RecordState.HELD, "Machine-A",
                 7, "2026-08-22T10:00:00Z", "2026-08-22T10:05:00Z", "PT10M",
                 List.of(new RepoStamp(".", "main", SHA_A)))
                 .serialize().lines().toList();

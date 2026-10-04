@@ -33,6 +33,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * scenario that asserts NO write happened compares the record byte for
  * byte instead. A fencing system's two halves must not merely both work —
  * they must agree.
+ *
+ * <p>Since IKE-Network/ike-issues#1215 the two agree <em>modulo
+ * vocabulary</em>: the Java side takes, returns and recalls where v2
+ * acquired, released and took over, and writes {@code state: returned}
+ * where v2 wrote {@code released}. Scenarios drive both sides with the v2
+ * verbs (which the CLI still accepts as aliases), and {@link #toV2}
+ * translates exactly that fixed list of phrases on the Java side before
+ * comparing — so every behavior, exit code and epoch is still held to the
+ * reference, and only the words moved.
  */
 class LeaseProtocolEquivalenceTest {
 
@@ -91,10 +100,43 @@ class LeaseProtocolEquivalenceTest {
     record Run(int exit, String stdout, String stderr, String record,
                long conflictCopies) { }
 
+    /**
+     * A fixture record with the state spelled exactly as given — v2's
+     * {@code released} included, since the reference script must read it.
+     */
     private static String record(String ws, String state, String holder,
                                  long epoch, String acquired, String renewed) {
-        return new LeaseRecord(ws, state, holder, epoch, acquired, renewed,
-                "PT10M").serialize();
+        return new LeaseRecord(ws, RecordState.parse(state), holder, epoch,
+                acquired, renewed, "PT10M").serialize()
+                .replaceFirst("(?m)^state: .*$", "state: " + state);
+    }
+
+    /**
+     * Translates the Java side's ike-lease 7 vocabulary back to v2's —
+     * the complete, fixed list of phrases #1215 changed, and nothing else.
+     */
+    static String toV2(String text) {
+        return text
+                .replace("state: returned\n", "state: released\n")
+                .replaceAll("(?m)^returned ", "released ")
+                .replace(") — nothing returned", ") — nothing released")
+                .replace(": FREE (returned by ", ": FREE (released by ")
+                .replaceAll("(?m)^took ", "acquired ")
+                .replaceAll("(?m)^RECALLED ", "TOOK OVER ")
+                .replaceAll("Recalling a live lease is a human decision\\. "
+                                + "To recall it:\n  lease\\.sh recall '([^']*)'",
+                        "Takeover of a live lease is a human decision. "
+                                + "To take it:\n  lease.sh acquire '$1' --force")
+                .replaceAll("Recalling a live lease is the human's call — ask "
+                                + "before running:\n  ~/ike-dev/scripts/lease\\.sh "
+                                + "recall '([^']*)'",
+                        "Taking over a live lease is the human's call — ask "
+                                + "before running:\n  ~/ike-dev/scripts/lease.sh "
+                                + "acquire '$1' --force")
+                .replace(": contested take resolved to ",
+                        ": contested acquisition resolved to ")
+                .replace("take it again deliberately if you meant to have it.",
+                        "re-acquire deliberately if you meant to take it.");
     }
 
     private static String freshStamp() {
@@ -127,7 +169,7 @@ class LeaseProtocolEquivalenceTest {
         prepare.apply(javaSide);
 
         Run shell = runShell(shellSide, verb, 0);
-        Run java = runJava(javaSide, verb, 0);
+        Run java = translated(runJava(javaSide, verb, 0));
 
         assertEquals(shell.exit(), java.exit(), label + ": exit code");
         assertEquals(normalize(shell.stdout(), shellSide),
@@ -168,6 +210,11 @@ class LeaseProtocolEquivalenceTest {
         return finish(sandbox, process.exitValue(), out, err);
     }
 
+    private static Run translated(Run run) {
+        return new Run(run.exit(), toV2(run.stdout()), toV2(run.stderr()),
+                toV2(run.record()), run.conflictCopies());
+    }
+
     private Run runJava(Sandbox sandbox, List<String> verb,
                         long settleSeconds) throws Exception {
         LeaseProtocol protocol = new LeaseProtocol(sandbox.ikeDev(),
@@ -176,13 +223,15 @@ class LeaseProtocolEquivalenceTest {
         List<String> rest = verb.subList(1, verb.size());
         LeaseProtocol.Outcome outcome = switch (v) {
             case "status" -> protocol.status(rest.get(0));
-            case "acquire" -> protocol.acquire(rest.get(0),
-                    rest.contains("--force"), rest.contains("--quiet"),
-                    rest.contains("--confirm"));
+            case "acquire" -> rest.contains("--force")       // v2 aliases
+                    ? protocol.recall(rest.get(0), rest.contains("--quiet"),
+                            rest.contains("--confirm"))
+                    : protocol.take(rest.get(0), rest.contains("--quiet"),
+                            rest.contains("--confirm"));
             case "ensure" -> protocol.ensure(rest.get(0),
                     rest.contains("--confirm"));
             case "renew" -> protocol.renew(rest.get(0));
-            case "release" -> protocol.release(rest.get(0));
+            case "release" -> protocol.returnLease(rest.get(0));
             case "list" -> protocol.list();
             case "resolve" -> protocol.resolve(rest.get(0));
             default -> throw new IllegalArgumentException(v);
@@ -445,7 +494,7 @@ class LeaseProtocolEquivalenceTest {
                     });
             Thread.sleep(1000);
             javaSide.writeRecord(WS + ".lease", competing);
-            java = running.get(60, TimeUnit.SECONDS);
+            java = translated(running.get(60, TimeUnit.SECONDS));
         }
 
         assertEquals(1, shell.exit(), "shell must lose the race");

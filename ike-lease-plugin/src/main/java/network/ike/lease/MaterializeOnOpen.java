@@ -24,6 +24,7 @@ import network.ike.lease.core.OriginManifest;
 import network.ike.lease.core.ProcessGitRunner;
 import network.ike.lease.core.RefAligner;
 import network.ike.lease.core.RepoStamp;
+import network.ike.lease.core.SiblingAligner;
 import network.ike.lease.core.WorkingSetName;
 
 /**
@@ -62,18 +63,26 @@ final class MaterializeOnOpen {
         indicator.setText("Materializing git state: " + workingSet);
         Materializer materializer = materializer(lease, indicator);
         WorkingSetName name = new WorkingSetName(workingSet);
-        // The stamps are read before anything else runs: the acquisition
-        // just carried the previous holder's stamps forward, and the
-        // watcher's next renewal will overwrite them with this machine's
-        // own refs (ike-issues#1069) — so the alignment target is captured
-        // now, not re-read later.
+        // The stamps are read before anything else runs: the take just
+        // carried the previous holder's stamps forward, and the watcher's
+        // next renewal will overwrite them with this machine's own refs
+        // (ike-issues#1069) — so the alignment target is captured now, not
+        // re-read later. A sibling needs no capture: its bundles name their
+        // own heads (ike-issues#1216).
         List<RepoStamp> stamps = name.isSibling() ? List.of()
                 : RefAligner.recordedStamps(lease.root(), workingSet);
         MaterializeReport report;
         RefAligner.AlignReport alignment = null;
         try {
             report = materializer.materialize(name);
-            if (!name.isSibling() && !stamps.isEmpty()) {
+            if (name.isSibling()
+                    && SiblingAligner.hasBundles(lease.root(), name)) {
+                indicator.setText("Aligning refs to the last holder's "
+                        + "history: " + workingSet);
+                alignment = new SiblingAligner(lease.root(),
+                        new ProcessGitRunner(), indicator::setText2)
+                        .align(name);
+            } else if (!name.isSibling() && !stamps.isEmpty()) {
                 indicator.setText("Aligning refs to the holder's stamps: "
                         + workingSet);
                 alignment = new RefAligner(lease.root(),
@@ -101,7 +110,7 @@ final class MaterializeOnOpen {
 
     /**
      * Schedules materialization in its own background task, for call sites
-     * that are not already inside one (the takeover path).
+     * that are not already inside one (the recall path).
      *
      * @param project    the project just opened on the working set
      * @param lease      the bridge to the lease protocol
@@ -160,7 +169,7 @@ final class MaterializeOnOpen {
     }
 
     /**
-     * Balloon-facing alignment outcome (ike-issues#1069): one info line
+     * Balloon-facing alignment outcome (ike-issues#1069, #1216): one info line
      * when refs moved, one capped warning when anything was refused —
      * divergence stays a human decision, so the balloon names it and
      * stops.
@@ -179,7 +188,7 @@ final class MaterializeOnOpen {
             LeaseNotifier.info(project, "Refs aligned",
                     workingSet + ": " + moved + (moved == 1
                             ? " repository moved" : " repositories moved")
-                            + " to the holder's stamps — tree untouched.");
+                            + " to the last holder's history — tree untouched.");
             refreshVcsView(project, lease, workingSet);
         }
         if (!refused.isEmpty()) {
