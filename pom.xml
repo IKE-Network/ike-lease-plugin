@@ -17,7 +17,7 @@
          released root declares its group; now this one does too. -->
     <groupId>network.ike</groupId>
     <artifactId>ike-lease</artifactId>
-    <version>8</version>
+    <version>9-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>IKE Working-Set Leases</name>
