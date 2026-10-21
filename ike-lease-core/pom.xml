@@ -38,6 +38,23 @@
             <version>5.11.4</version>
             <scope>test</scope>
         </dependency>
+        <!-- The released build lock the IDE side must interoperate with
+             (IKE-Network/ike-issues#1315): the tests run its BuildLock in
+             child JVMs against BuildLockClient, in both directions. Only
+             BuildLock and Durations are loaded, and both are plain JDK, so
+             the extension's Maven API dependencies stay out. -->
+        <dependency>
+            <groupId>network.ike.tooling</groupId>
+            <artifactId>ike-workspace-extension</artifactId>
+            <version>15</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
     </dependencies>
 
     <build>

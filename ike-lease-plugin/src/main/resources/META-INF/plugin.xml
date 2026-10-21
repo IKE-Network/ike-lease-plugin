@@ -15,6 +15,10 @@
         are saved and the project is closed so the work reaches the machine
         that recalled it.
         <br/><br/>
+        IDE compiles take the working set's build lock, the one
+        ike-workspace-extension's Maven builds take, so an IDE compile and
+        a Maven build of the same tree never write its classes at once.
+        <br/><br/>
         Design: <code>dev-working-set-lease</code> in ike-lab-documents;
         implementation tracked in IKE-Network/ike-issues#1002.
     ]]></description>
@@ -24,6 +28,9 @@
          (GitPushTarget → GitRemote), so the git plugin's classes must be
          visible to this plugin's classloader. -->
     <depends>Git4Idea</depends>
+    <!-- IntelliJ's compiler API lives in the Java plugin; where it is, IDE
+         compiles take the working set's build lock (ike-issues#1315). -->
+    <depends optional="true" config-file="ike-lease-java.xml">com.intellij.java</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <notificationGroup id="IKE Working-Set Leases"
@@ -31,6 +38,12 @@
         <!-- Refuses pushes from a sibling working set to anything but its
              local parent (ike-issues#992, #1057). -->
         <prePushHandler implementation="network.ike.lease.SiblingPrePushGuard"/>
+        <!-- Settings → Tools → IKE Build Lock: turns the compile-time build
+             lock off (ike-issues#1315). -->
+        <applicationConfigurable parentId="tools"
+                                 instance="network.ike.lease.BuildLockConfigurable"
+                                 id="network.ike.lease.buildLock"
+                                 displayName="IKE Build Lock"/>
     </extensions>
 
     <applicationListeners>

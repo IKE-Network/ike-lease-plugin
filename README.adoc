@@ -74,6 +74,37 @@ state, tree-untouched in both directions:
 Closing a project releases its lease, so the next machine to open it
 acquires in silence rather than meeting a dialog.
 
+=== The build lock around IDE compiles
+
+`ike-workspace-extension` 15 gives every Maven build of a tree an
+exclusive OS lock on `<root>/.mvn/target/build.lock`
+(`IKE-Network/ike-issues#1314`). IntelliJ's own compiler writes into
+the same `target/classes`, so the plugin takes the same lock around
+each IDE compile (`IKE-Network/ike-issues#1315`). The compile is still
+IntelliJ's own: nothing is delegated to Maven, and the
+edit, compile, hot-swap cycle keeps its speed.
+
+* A before-compile task takes the lock and an after-compile task gives
+  it back. The lock covers the compile only: it is released before the
+  run or debug session the compile preceded starts.
+* If a Maven build holds the lock, the compile's progress indicator
+  names it (pid, host, start time, goals, `-pl`) and waits. Cancelling
+  the compile stops the wait. After a second, a notification offers
+  *Build anyway*, which compiles unlocked and warns.
+* While the IDE compiles, a Maven build of the tree waits too. Its
+  notice names the holder as `IntelliJ make` (or `rebuild`/`compile`)
+  with the modules compiled.
+* The lock is held by a small helper JVM the plugin starts on the first
+  compile, never by the IDE process. POSIX record locks belong to the
+  process, and the IDE's file watcher, VFS refresh and indexer open
+  and close any file they see; closing one descriptor would silently
+  drop the lock. The helper exits when the IDE does, crashes included,
+  and the OS releases its locks, so a dead IDE never wedges a tree.
+* Only trees whose `.mvn/extensions.xml` loads `ike-workspace-extension`
+  are locked. Settings -> Tools -> *IKE Build Lock* turns it off.
+* Automatic background builds (*Build project automatically*) bypass
+  IntelliJ's compile tasks and are not locked.
+
 == Installing
 
 [source,bash]

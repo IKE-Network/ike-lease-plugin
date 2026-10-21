@@ -185,6 +185,8 @@ public final class LeaseProjectListener implements ProjectManagerListener {
      */
     @Override
     public void projectClosed(Project project) {
+        // A compile cut off by the close may not have reported finishing.
+        BuildLockService.getInstance().releaseInBackground(project, null);
         String basePath = project.getBasePath();
         if (basePath == null) {
             return;

@@ -136,6 +136,16 @@
             <version>${idea.build}</version>
             <scope>provided</scope>
         </dependency>
+        <!-- CompileTask, CompileContext, CompilationStatusListener: the
+             compiler API, in the Java plugin (an optional dependency in
+             plugin.xml) — the build lock around IDE compiles
+             (IKE-Network/ike-issues#1315). -->
+        <dependency>
+            <groupId>com.jetbrains.intellij.java</groupId>
+            <artifactId>java-compiler</artifactId>
+            <version>${idea.build}</version>
+            <scope>provided</scope>
+        </dependency>
         <!-- org.jetbrains.annotations — the real thing from Central. -->
         <dependency>
             <groupId>org.jetbrains</groupId>

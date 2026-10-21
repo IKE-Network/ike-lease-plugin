@@ -1,0 +1,14 @@
+<idea-plugin>
+    <!-- Loaded only where the Java plugin is, since IntelliJ's compiler
+         API lives there. The working set's build lock around the IDE's own
+         compiles (IKE-Network/ike-issues#1315). -->
+    <extensions defaultExtensionNs="com.intellij">
+        <compiler.task execute="BEFORE" implementation="network.ike.lease.BuildLockBeforeCompile"/>
+        <compiler.task execute="AFTER" implementation="network.ike.lease.BuildLockAfterCompile"/>
+    </extensions>
+
+    <projectListeners>
+        <listener class="network.ike.lease.BuildLockCompilationListener"
+                  topic="com.intellij.openapi.compiler.CompilationStatusListener"/>
+    </projectListeners>
+</idea-plugin>
